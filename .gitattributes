@@ -1,3 +1,5 @@
+# SIGame-пакеты — бинарные: без конвертации концов строк (иначе ломается ZIP внутри .siq)
+*.siq -text
 *.tmp filter=lfs diff=lfs merge=lfs -text
 <<<<<<< HEAD
 
