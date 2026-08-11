@@ -1,0 +1,5 @@
+# Scratch / build artifacts
+__pycache__/
+*.pyc
+image-search/
+*.tmp
