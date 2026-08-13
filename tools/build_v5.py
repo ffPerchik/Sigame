@@ -17,6 +17,8 @@
 """
 from __future__ import annotations
 
+import base64
+import datetime
 import hashlib
 import sys
 import zipfile
@@ -106,7 +108,22 @@ def build_bts_theme():
     return th
 
 
-INJECTORS = {"armenian": build_armenian_theme, "bts": build_bts_theme}
+def build_quest_theme():
+    """Тема-крючок квеста: 1 вопрос с картинкой-подсказкой.
+    Картинка прямо ведёт: переименуй .siq в .zip и распакуй. Внутри пакета
+    спрятан START.txt (см. QUEST_START ниже) — реальный старт квеста."""
+    th = ET.Element(q("theme"), {"name": "🧩 Послание"})
+    qs = ET.SubElement(th, q("questions"))
+    items = [
+        ("text", "В пакете спрятано послание. Разгадай, что нужно сделать с файлом, чтобы его найти."),
+        ("image", "quest_hint.jpg"),
+    ]
+    answers = [".zip", "zip", "зип", "переименовать в zip", "переименовать в .zip", "архив"]
+    qs.append(make_question(500, items, answers))
+    return th
+
+
+INJECTORS = {"armenian": build_armenian_theme, "bts": build_bts_theme, "quest": build_quest_theme}
 
 # ---- план раундов: (название, [индексы исходных тем], [инъекции]) ----
 ROUND_PLAN = [
@@ -114,8 +131,32 @@ ROUND_PLAN = [
     ("Раунд 2 — Кино, мультики, мемы", [0, 1, 3, 5, 13, 8],    []),
     ("Раунд 3 — Музыка и стиль",       [9, 14, 18, 10, 23],    []),
     ("Раунд 4 — Игры и головоломки",   [7, 12, 22, 24, 6, 11], []),
-    ("Раунд 5 — Микс + бонус",         [2, 17, 20, 26],         ["armenian", "bts"]),
+    ("Раунд 5 — Микс + бонус",         [2, 17, 20, 26],         ["armenian", "bts", "quest"]),
 ]
+
+
+def quest_start_text() -> str:
+    """Скрытый START.txt внутри .siq — первый (расширяемый) шаг квеста."""
+    secret = ("ПОЗДРАВЛЯЮ. ТЫ НАШЁЛ ВХОД В ИНДИВИДУАЛЬНЫЙ КВЕСТ — "
+              "КАЖДЫЙ ИДЁТ САМ ЗА СЕБЯ. СЛЕДУЮЩИЙ СЛОЙ БУДЕТ СПРЯТАН ГЛУБЖЕ: "
+              "В КАРТИНКАХ, В ОТВЕТАХ, В РЕАЛЬНЫХ ТОЧКАХ. "
+              "ХОРОШО СПРЯТАННОЕ — ХОРОШО НАЙДЁННОЕ.")
+    blob = base64.b64encode(secret.encode("utf-8")).decode("ascii")
+    blob_lines = "\n".join(blob[i:i + 64] for i in range(0, len(blob), 64))
+    return (
+        "   ╔══════════════════════════════════════════════╗\n"
+        "   ║   ВЫ НАШЛИ НАЧАЛО                             ║\n"
+        "   ╚══════════════════════════════════════════════╝\n"
+        "\n"
+        "   Тот, кто читает это, — перестал быть просто игроком.\n"
+        "   Дальше каждый сам за себя.\n"
+        "\n"
+        "   Первое послание закодировано (Base64 → UTF-8). Расшифруй:\n"
+        "\n"
+        f"{blob_lines}\n"
+        "\n"
+        "   — хороший поиск вознаграждается. Продолжение следует.\n"
+    )
 
 
 def main() -> int:
@@ -171,7 +212,6 @@ def main() -> int:
 
     # имя/дата пакета
     root.set("name", "Своя игра для друзей")
-    import datetime
     root.set("date", datetime.date.today().strftime("%d.%m.%Y"))
 
     # манифест <files>: добавляем свои картинки
@@ -202,6 +242,9 @@ def main() -> int:
         z.writestr("[Content].xml", new_xml)
         if qm is not None:
             z.writestr("quality.marker", qm)
+        # Скрытый старт квеста: обычный файл в ZIP, который SIGame игнорирует,
+        # а игрок находит, переименовав .siq в .zip и распаковав.
+        z.writestr("START.txt", quest_start_text())
         for name, data in media.items():
             z.writestr(name, data)
 
