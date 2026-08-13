@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-Сборка финального пакета SIGame (формат v5) из заготовки Zengame.siq.
+Сборка финального пакета SIGame (формат v5) → zengame.siq.
 
 Что делает:
-  1. Читает content.xml и всё медиа прямо из Zengame.siq (без распаковки на диск).
-  2. Перераспределяет 27 исходных тем по 5 раундам (Раунд 1 — полностью
-     тематический «География»), перенося <theme> целиком (спецтипы и медиа-ссылки
-     сохраняются).
-  3. Добавляет две новые темы в формате v5: «Армянская еда» и «BTS»
-     (фото → название; картинки берутся из content/Images/).
-  4. Регенерирует <files>-манифест (sha256) для добавленных картинок.
-  5. Собирает новый .siq: content.xml + [Content].xml + всё медиа + мои картинки.
+  1. Читает content.xml и медиа прямо из source.siq (без распаковки на диск).
+  2. Раскладывает 27 исходных тем по 5 раундам (Раунд 1 — полностью
+     тематический «География») + добавляет ФИНАЛ (type="final").
+  3. Переименовывает ВСЕ темы в вид «<смайлик><название>» (смайлики уникальны).
+  4. Добавляет свои темы: «Армянская еда», «BTS» и финальную тему со
+     стеганографической фоткой (final_photo.png — обычный пейзаж, внутри LSB-послание).
+  5. Регенерирует <files>-манифест для добавленных картинок.
+  6. Кладёт скрытый START.txt (SIGame игнорирует) — следующий слой квеста.
 
 Запуск:
     python3 tools/build_v5.py
@@ -29,13 +29,45 @@ NS = "https://github.com/VladimirKhil/SI/blob/master/assets/siq_5.xsd"
 ET.register_namespace("", NS)
 
 ROOT = Path(__file__).resolve().parent.parent
-ZEN = ROOT / "Zengame.siq"
+ZEN = ROOT / "source.siq"            # исходная заготовка (27 тем + медиа)
 MY_IMAGES = ROOT / "content" / "Images"
-OUT_SIQ = ROOT / "Своя игра для друзей.siq"
+OUT_SIQ = ROOT / "zengame.siq"       # финальный пакет
 
 
 def q(tag: str) -> str:
     return f"{{{NS}}}{tag}"
+
+
+# ---- переименование тем: индекс исходной темы -> «<смайлик><название>» (смайлики уникальны) ----
+RENAME = {
+    0:  "🎬 Кинчик",
+    1:  "📷 Картинка с фразой",
+    2:  "🙈 Случайные вопросы",
+    3:  "📺 Мультики",
+    4:  "🏙 Столицы стран",
+    5:  "🧅 Шрек",
+    6:  "🏺 Античность",
+    7:  "🧱 Построили в майнкрафт",
+    8:  "🎨 Хреново нарисовали мем",
+    9:  "🎤 Продолжи песню",
+    10: "💑 Вторая половинка",
+    11: "🎲 Рандом вопрос",
+    12: "🦝 Тему захватили Еноты",
+    13: "🧸 Всё о мультиках",
+    14: "🎧 Лучшие песни Shazam 2025",
+    15: "🔤 Анаграммы городов",
+    16: "🧭 Страна по президенту",
+    17: "🎯 Рандом вопрос",
+    18: "👘 Женский косплей",
+    19: "🚩 А ты знаешь флаги?",
+    20: "🧮 Рандом вопросы",
+    21: "🌍 Из какой страны?",
+    22: "🔎 Задачи на внимательность",
+    23: "📜 Средневековые афиши",
+    24: "⚖ 50/50",
+    25: "💰 Валюта",
+    26: "❓ Случайный вопрос",
+}
 
 
 # ---- конструирование v5-вопросов ----
@@ -71,7 +103,7 @@ def make_question(price, question_items, answers):
 
 
 def build_armenian_theme():
-    th = ET.Element(q("theme"), {"name": "Армянская еда 🍽"})
+    th = ET.Element(q("theme"), {"name": "🍽 Армянская еда"})
     qs = ET.SubElement(th, q("questions"))
     data = [
         (100, [("text", "Назовите этот армянский хлеб — его пекут в тони́ре, а в 2014 году внесли в список нематериального наследия ЮНЕСКО."),
@@ -91,7 +123,7 @@ def build_armenian_theme():
 
 
 def build_bts_theme():
-    th = ET.Element(q("theme"), {"name": "BTS 🎤"})
+    th = ET.Element(q("theme"), {"name": "💜 BTS"})
     qs = ET.SubElement(th, q("questions"))
     members = [
         (100, "bts-rm.jpg",       ["RM", "Ким Намджун", "Намджун", "Ким Нам-джун"]),
@@ -108,30 +140,31 @@ def build_bts_theme():
     return th
 
 
-def build_quest_theme():
-    """Тема-крючок квеста: 1 вопрос с картинкой-подсказкой.
-    Картинка прямо ведёт: переименуй .siq в .zip и распакуй. Внутри пакета
-    спрятан START.txt (см. QUEST_START ниже) — реальный старт квеста."""
-    th = ET.Element(q("theme"), {"name": "🧩 Послание"})
+def build_final_theme():
+    """Финальная тема: обычный пейзаж со спрятанным (LSB) посланием.
+    Вопрос учит слову «стеганография» — намёк извлечь скрытое из картинки."""
+    th = ET.Element(q("theme"), {"name": "🔑 Финал"})
     qs = ET.SubElement(th, q("questions"))
     items = [
-        ("text", "В пакете спрятано послание. Разгадай, что нужно сделать с файлом, чтобы его найти."),
-        ("image", "quest_hint.jpg"),
+        ("text", "Финал. Перед вами обычный пейзаж. Но внутри изображения спрятано послание. "
+                 "Назовите способ скрытия сообщений внутри картинок."),
+        ("image", "final_photo.png"),
     ]
-    answers = [".zip", "zip", "зип", "переименовать в zip", "переименовать в .zip", "архив"]
-    qs.append(make_question(500, items, answers))
+    answers = ["стеганография", "стеганографія", "steganography"]
+    qs.append(make_question(0, items, answers))
     return th
 
 
-INJECTORS = {"armenian": build_armenian_theme, "bts": build_bts_theme, "quest": build_quest_theme}
+INJECTORS = {"armenian": build_armenian_theme, "bts": build_bts_theme, "final": build_final_theme}
 
-# ---- план раундов: (название, [индексы исходных тем], [инъекции]) ----
+# ---- план раундов: (название, тип, [индексы тем], [инъекции]) ----
 ROUND_PLAN = [
-    ("Раунд 1 — География",            [4, 15, 16, 19, 21, 25], []),
-    ("Раунд 2 — Кино, мультики, мемы", [0, 1, 3, 5, 13, 8],    []),
-    ("Раунд 3 — Музыка и стиль",       [9, 14, 18, 10, 23],    []),
-    ("Раунд 4 — Игры и головоломки",   [7, 12, 22, 24, 6, 11], []),
-    ("Раунд 5 — Микс + бонус",         [2, 17, 20, 26],         ["armenian", "bts", "quest"]),
+    ("Раунд 1 — География",            None,    [4, 15, 16, 19, 21, 25], []),
+    ("Раунд 2 — Кино, мультики, мемы", None,    [0, 1, 3, 5, 13, 8],    []),
+    ("Раунд 3 — Музыка и стиль",       None,    [9, 14, 18, 10, 23],    []),
+    ("Раунд 4 — Игры и головоломки",   None,    [7, 12, 22, 24, 6, 11], []),
+    ("Раунд 5 — Микс + бонус",         None,    [2, 17, 20, 26],         ["armenian", "bts"]),
+    ("Финал",                          "final", [],                      ["final"]),
 ]
 
 
@@ -161,7 +194,7 @@ def quest_start_text() -> str:
 
 def main() -> int:
     if not ZEN.exists():
-        print(f"Zengame.siq не найден: {ZEN}", file=sys.stderr)
+        print(f"Исходный пакет не найден: {ZEN}", file=sys.stderr)
         return 1
 
     with zipfile.ZipFile(ZEN) as z:
@@ -184,34 +217,37 @@ def main() -> int:
     theme_list = orig_themes_el.findall(f"{q('theme')}")
     print(f"исходных тем: {len(theme_list)}")
 
-    # проверка покрытия
     used = set()
-    for _, idxs, _ in ROUND_PLAN:
+    for _, _, idxs, _ in ROUND_PLAN:
         used.update(idxs)
     missing = set(range(len(theme_list))) - used
     if missing:
         print(f"⚠ темы без раунда (индексы): {sorted(missing)}", file=sys.stderr)
 
-    # detached themes by index
     by_idx = {i: t for i, t in enumerate(theme_list)}
 
-    # пересобираем <rounds>
     rounds_el = root.find(f"{q('rounds')}")
     rounds_el.remove(orig_round)
-    for rname, idxs, inject in ROUND_PLAN:
-        r = ET.SubElement(rounds_el, q("round"), {"name": rname})
+    for rname, rtype, idxs, inject in ROUND_PLAN:
+        attrs = {"name": rname}
+        if rtype:
+            attrs["type"] = rtype
+        r = ET.SubElement(rounds_el, q("round"), attrs)
         ths = ET.SubElement(r, q("themes"))
         for i in idxs:
-            ths.append(by_idx[i])
+            el = by_idx[i]
+            if i in RENAME:
+                el.set("name", RENAME[i])
+            ths.append(el)
         for inj in inject:
             ths.append(INJECTORS[inj]())
         n_themes = len(ths)
         n_qs = sum(len(t.find(f"{q('questions')}").findall(f"{q('question')}"))
                    for t in ths)
-        print(f"  {rname}: тем={n_themes}, вопросов={n_qs}")
+        print(f"  {rname}{' ['+rtype+']' if rtype else ''}: тем={n_themes}, вопросов={n_qs}")
 
     # имя/дата пакета
-    root.set("name", "Своя игра для друзей")
+    root.set("name", "Zengame")
     root.set("date", datetime.date.today().strftime("%d.%m.%Y"))
 
     # манифест <files>: добавляем свои картинки
@@ -231,10 +267,8 @@ def main() -> int:
                 added += 1
     print(f"добавлено картинок в манифест: {added}")
 
-    # сериализация
     new_xml = ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
-    # сборка .siq
     if OUT_SIQ.exists():
         OUT_SIQ.unlink()
     with zipfile.ZipFile(OUT_SIQ, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
@@ -242,8 +276,7 @@ def main() -> int:
         z.writestr("[Content].xml", new_xml)
         if qm is not None:
             z.writestr("quality.marker", qm)
-        # Скрытый старт квеста: обычный файл в ZIP, который SIGame игнорирует,
-        # а игрок находит, переименовав .siq в .zip и распаковав.
+        # скрытый старт квеста (SIGame игнорирует лишние файлы в ZIP)
         z.writestr("START.txt", quest_start_text())
         for name, data in media.items():
             z.writestr(name, data)
