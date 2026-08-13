@@ -1,4 +1,0 @@
-*.tmp filter=lfs diff=lfs merge=lfs -text
-*.siq filter=lfs diff=lfs merge=lfs -text
-Zengame.siq filter=lfs diff=lfs merge=lfs -text
-Zengame.tmp filter=lfs diff=lfs merge=lfs -text
