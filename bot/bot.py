@@ -237,8 +237,10 @@ async def cmd_hint(message: Message) -> None:
     hint = st.get("hint") if st else None
     if not hint:
         return await message.answer("На эту стадию подсказки нет.")
+    if db.hint_used(uid, p["stage"]) > 0:
+        return await message.answer("На эту стадию подсказка уже использована — повторно нельзя. На следующем этапе будет новая.")
     db.inc_hint(uid, p["stage"])
-    await message.answer(f"💡 {hint}\n\n(подсказки учитываются в финальном счёте)")
+    await message.answer(f"💡 {hint}\n\n(Подсказка на эту стадию потрачена. На следующей — новая.)")
     if cfg.NOTIFY_HOST:
         await notify_host(f"💡 {_name(p)} взял подсказку на «{p['stage']}»")
 
