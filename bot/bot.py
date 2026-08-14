@@ -275,6 +275,26 @@ async def cmd_help(message: Message) -> None:
         await message.answer(PLAYER_HELP)
 
 
+@dp.message(Command("id"))
+async def cmd_id(message: Message) -> None:
+    """Диагностика: показывает id отправителя и сравнивает с HOST_ID."""
+    uid = message.from_user.id
+    if uid == cfg.HOST_ID:
+        verdict = "✅ совпадает — ты ведущий, админ-команды работают"
+    else:
+        verdict = "❌ НЕ совпадает с HOST_ID — админ-команды (/stats и т.д.) молчат. " \
+                  "Впишь свой реальный id в .env как HOST_ID и перезапусти бота."
+    await message.answer(
+        f"Твой Telegram ID: <code>{uid}</code>\n"
+        f"HOST_ID в .env: <code>{cfg.HOST_ID}</code>\n{verdict}"
+    )
+
+
+@dp.message(Command("ping"))
+async def cmd_ping(message: Message) -> None:
+    await message.answer("🏓 pong — бот жив и отвечает")
+
+
 # ----------------- ведущий: апрув (кнопки) -----------------
 
 @dp.callback_query(F.data.startswith("appr:"))
