@@ -214,30 +214,6 @@ async def _submit_for_approval(uid: int, message: Message) -> None:
     await message.answer("📨 Отправлено ведущему на проверку. Жди.")
 
 
-@dp.message(F.content_type.in_({"text", "photo", "document", "voice", "video"}))
-async def on_message(message: Message) -> None:
-    uid = message.from_user.id
-    # (раньше здесь был запрет ведущему слать ответы — убран: теперь ведущий
-    #  может тестировать квест за игрока тем же аккаунтом)
-    if message.text and message.text.startswith("/"):
-        await message.answer("Неизвестная команда. /help")
-        return
-    player = db.get_player(uid)
-    if player is None:
-        await message.answer("Сначала /start <код из квеста>.")
-        return
-    st = quest.get_stage(player["stage"])
-    if not st or st.get("mode") == "finish":
-        await message.answer("Ты уже прошёл квест 🏆")
-        return
-    if st.get("mode") == "auto":
-        await _try_answer(uid, message, message.text or message.caption or "")
-    elif st.get("mode") == "approve":
-        await _submit_for_approval(uid, message)
-    else:
-        await message.answer("Жди — это информационная стадия или нужна проверка. /hint")
-
-
 # ----------------- игрок: команды -----------------
 
 @dp.message(Command("progress"))
@@ -470,6 +446,32 @@ async def cmd_reject_cmd(message: Message, command: Command) -> None:
             await bot.send_message(uid, f"❌ {reason}")
             return await message.answer("Отклонено.")
     await message.answer("Нет pending-сабмита.")
+
+
+# ----------------- универсальный приёмник (registriruem ПОСЛЕДНИМ!) -----------------
+# Ловит ответы/фото игроков. Стоит в самом конце, чтобы командные хендлеры выше
+# перехватывали свои команды (/help, /stats, ...), а не этот catch-all.
+
+@dp.message(F.content_type.in_({"text", "photo", "document", "voice", "video"}))
+async def on_message(message: Message) -> None:
+    uid = message.from_user.id
+    if message.text and message.text.startswith("/"):
+        await message.answer("Неизвестная команда. /help")
+        return
+    player = db.get_player(uid)
+    if player is None:
+        await message.answer("Сначала /start <код из квеста>.")
+        return
+    st = quest.get_stage(player["stage"])
+    if not st or st.get("mode") == "finish":
+        await message.answer("Ты уже прошёл квест 🏆")
+        return
+    if st.get("mode") == "auto":
+        await _try_answer(uid, message, message.text or message.caption or "")
+    elif st.get("mode") == "approve":
+        await _submit_for_approval(uid, message)
+    else:
+        await message.answer("Жди — это информационная стадия или нужна проверка. /hint")
 
 
 # ----------------- main -----------------
