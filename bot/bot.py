@@ -49,7 +49,7 @@ ADMIN_HELP = (
     "Команды ведущего:\n"
     "/stats — прогресс всех игроков (+ id и баланс подсказок)\n"
     "/pending — очередь на апрув\n"
-    "/addhint <@username или id> <n> — начислить/списать подсказки (n м.б. отрицательным)\n"
+    "/addhint <@username или id> <n> — начислить игроку подсказки (сколько он ЗАРАБОТАЛ в «Своей игре»)\n"
     "/sethint <@username или id> <n> — установить точный баланс подсказок\n"
     "/setstage <id> <stage_id> — перевести игрока вручную\n"
     "/broadcast <текст> — сообщение всем\n"
@@ -117,12 +117,9 @@ async def advance(uid: int) -> None:
         db.mark_finished(uid)
         p2 = db.get_player(uid)
         b = (p2["banked"] or 0) if p2 else 0
-        await bot.send_message(
-            uid, f"📊 Ты накопил {b} подсказок для грядущей Игры. "
-                 f"Чем больше — тем больше преимущество в «Своей игре»."
-        )
+        await bot.send_message(uid, f"📊 Квест пройден! У тебя осталось {b} подсказок.")
         if cfg.NOTIFY_HOST:
-            await notify_host(f"🏆 {name} ЗАВЕРШИЛ квест! Накоплено подсказок: {b}")
+            await notify_host(f"🏆 {name} ЗАВЕРШИЛ квест! Осталось подсказок: {b}")
 
 
 def _name(p) -> str:
@@ -169,11 +166,10 @@ async def _try_answer(uid: int, message: Message, text: str) -> None:
     if not st or st.get("mode") != "auto":
         return
     if quest.validate(st.get("accept", []), text):
-        b = db.add_banked(uid, 1)
-        await message.answer(f"✅ Верно! +1 подсказка для Игры (накоплено: {b}).")
+        await message.answer("✅ Верно!")
         await advance(uid)
     else:
-        await message.answer("❌ Неверно. Попробуй ещё. /hint — подсказка.")
+        await message.answer("❌ Неверно. Попробуй ещё. /hint — подсказка (стоит 1 подсказку).")
 
 
 async def _submit_for_approval(uid: int, message: Message) -> None:
@@ -221,10 +217,11 @@ async def cmd_progress(message: Message) -> None:
     p = db.get_player(message.from_user.id)
     if not p:
         return await message.answer("Ты ещё не в квесте.")
+    bal = p["banked"] or 0
     if p["finished_at"]:
-        await message.answer(f"🏁 Ты прошёл квест! Накоплено подсказок для Игры: {p['banked'] or 0}.")
+        await message.answer(f"🏁 Ты прошёл квест! Осталось подсказок: {bal}.")
     else:
-        await message.answer(f"Ты на стадии: «{p['stage']}». Накоплено подсказок для Игры: {p['banked'] or 0}.")
+        await message.answer(f"Ты на стадии: «{p['stage']}». Осталось подсказок: {bal}.")
 
 
 @dp.message(Command("hint"))
@@ -237,12 +234,13 @@ async def cmd_hint(message: Message) -> None:
     hint = st.get("hint") if st else None
     if not hint:
         return await message.answer("На эту стадию подсказки нет.")
-    if db.hint_used(uid, p["stage"]) > 0:
-        return await message.answer("На эту стадию подсказка уже использована — повторно нельзя. На следующем этапе будет новая.")
-    db.inc_hint(uid, p["stage"])
-    await message.answer(f"💡 {hint}\n\n(Подсказка на эту стадию потрачена. На следующей — новая.)")
+    bal = p["banked"] or 0
+    if bal <= 0:
+        return await message.answer("У тебя нет подсказок. Подсказки зарабатывают в «Своей игре», а здесь — тратят.")
+    db.add_banked(uid, -1)
+    await message.answer(f"💡 {hint}\n\n(Потрачена 1 подсказка. Осталось: {bal-1}.)")
     if cfg.NOTIFY_HOST:
-        await notify_host(f"💡 {_name(p)} взял подсказку на «{p['stage']}»")
+        await notify_host(f"💡 {_name(p)} потратил подсказку на «{p['stage']}» (осталось {bal-1})")
 
 
 @dp.message(Command("help"))
@@ -283,13 +281,12 @@ async def cb_appr(cq: CallbackQuery) -> None:
     uid, sub_id = int(uid), int(sub_id)
     db.set_submission_status(sub_id, "approved")
     db.log_event(uid, "approved", f"sub#{sub_id}")
-    b = db.add_banked(uid, 1)
     await cq.answer("Одобрено ✅")
     try:
         await cq.message.edit_reply_markup(reply_markup=None)
     except Exception:
         pass
-    await bot.send_message(uid, f"✅ Засчитано! +1 подсказка для Игры (накоплено: {b}).")
+    await bot.send_message(uid, "✅ Засчитано! Двигаемся дальше.")
     await advance(uid)
 
 
@@ -315,7 +312,7 @@ async def cmd_stats(message: Message) -> None:
     rows = db.all_players()
     if not rows:
         return await message.answer("Игроков пока нет.")
-    lines = ["📊 Прогресс (подсказки для Игры накоплены за пройденные этапы):"]
+    lines = ["📊 Прогресс (подсказки заработаны в «Своей игре», тратятся в квесте):"]
     for r in rows:
         mark = "🏁" if r["finished_at"] else "🚶"
         lines.append(
@@ -428,8 +425,7 @@ async def cmd_approve(message: Message, command: Command) -> None:
         if r["user_id"] == uid:
             db.set_submission_status(r["id"], "approved")
             db.log_event(uid, "approved", f"sub#{r['id']}")
-            b = db.add_banked(uid, 1)
-            await bot.send_message(uid, f"✅ Засчитано! +1 подсказка для Игры (накоплено: {b}).")
+            await bot.send_message(uid, "✅ Засчитано!")
             await advance(uid)
             return await message.answer("Одобрено.")
     await message.answer("У этого игрока нет pending-сабмитов.")
