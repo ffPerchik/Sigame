@@ -47,13 +47,24 @@ PLAYER_HELP = (
 )
 ADMIN_HELP = (
     "Команды ведущего:\n"
-    "/stats — прогресс всех игроков\n"
+    "/stats — прогресс всех игроков (+ id и баланс подсказок)\n"
     "/pending — очередь на апрув\n"
-    "/setstage <user_id> <stage_id> — перевести игрока вручную\n"
+    "/addhint <@username или id> <n> — начислить/списать подсказки (n м.б. отрицательным)\n"
+    "/sethint <@username или id> <n> — установить точный баланс подсказок\n"
+    "/setstage <id> <stage_id> — перевести игрока вручную\n"
     "/broadcast <текст> — сообщение всем\n"
-    "/reset <user_id> — сбросить игрока в начало\n"
+    "/reset <id> — сбросить игрока в начало\n"
     "На сабмитах есть кнопки ✅/❌ (можно и /approve, /reject)."
 )
+
+
+def _resolve(arg: str):
+    """@username или числовой id -> user_id (или None)."""
+    arg = (arg or "").strip().lstrip("@")
+    if arg.isdigit():
+        uid = int(arg)
+        return uid if db.get_player(uid) else None
+    return db.find_by_username(arg)
 
 
 # ----------------- вспомогательные -----------------
@@ -309,7 +320,10 @@ async def cmd_stats(message: Message) -> None:
     lines = ["📊 Прогресс (подсказки для Игры накоплены за пройденные этапы):"]
     for r in rows:
         mark = "🏁" if r["finished_at"] else "🚶"
-        lines.append(f"{mark} {r['name']} (@{r['username'] or '—'}): «{r['stage'] or '—'}» | подсказок: {r['banked'] or 0}")
+        lines.append(
+            f"{mark} {r['name']} (@{r['username'] or '—'}) [id:{r['user_id']}]: "
+            f"«{r['stage'] or '—'}» | подсказок: {r['banked'] or 0}"
+        )
     await message.answer("\n".join(lines))
 
 
@@ -322,6 +336,49 @@ async def cmd_pending(message: Message) -> None:
     for r in rows:
         lines.append(f"#{r['id']} {r['name']} (@{r['username'] or '—'}): «{r['stage']}» — {r['payload'] or r['kind']}")
     await message.answer("\n".join(lines))
+
+
+@dp.message(HostFilter(), Command("addhint"))
+async def cmd_addhint(message: Message, command: Command) -> None:
+    args = (command.args or "").split()
+    if len(args) < 2:
+        return await message.answer("/addhint <@username или id> <число>  (число может быть отрицательным — списать)")
+    target = _resolve(args[0])
+    if not target:
+        return await message.answer("Игрок не найден. /stats — список с id.")
+    try:
+        n = int(args[1])
+    except ValueError:
+        return await message.answer("Число некорректно.")
+    p = db.get_player(target)
+    b = db.add_banked(target, n)
+    sign = f"{'начислено' if n>=0 else 'списано'} {abs(n)}"
+    await message.answer(f"✅ {p['name']}: {sign}. Теперь подсказок: {b}.")
+    try:
+        await bot.send_message(target, f"📊 Твой баланс подсказок изменился ({sign}). Теперь: {b}.")
+    except Exception:
+        pass
+
+
+@dp.message(HostFilter(), Command("sethint"))
+async def cmd_sethint(message: Message, command: Command) -> None:
+    args = (command.args or "").split()
+    if len(args) < 2:
+        return await message.answer("/sethint <@username или id> <число>")
+    target = _resolve(args[0])
+    if not target:
+        return await message.answer("Игрок не найден. /stats — список с id.")
+    try:
+        n = int(args[1])
+    except ValueError:
+        return await message.answer("Число некорректно.")
+    p = db.get_player(target)
+    b = db.set_banked(target, n)
+    await message.answer(f"✅ {p['name']}: баланс подсказок установлен = {b}.")
+    try:
+        await bot.send_message(target, f"📊 Твой баланс подсказок: {b}.")
+    except Exception:
+        pass
 
 
 @dp.message(HostFilter(), Command("setstage"))

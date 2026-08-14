@@ -99,6 +99,21 @@ def add_banked(user_id: int, n: int = 1) -> int:
         return row["banked"] if row else 0
 
 
+def set_banked(user_id: int, n: int) -> int:
+    with _conn() as c:
+        c.execute("UPDATE players SET banked=? WHERE user_id=?", (n, user_id))
+        return n
+
+
+def find_by_username(username: str) -> Optional[int]:
+    username = username.lstrip("@")
+    with _conn() as c:
+        row = c.execute(
+            "SELECT user_id FROM players WHERE username=? COLLATE NOCASE", (username,)
+        ).fetchone()
+        return row["user_id"] if row else None
+
+
 def add_submission(user_id: int, stage: str, kind: str, payload: str, file_id: Optional[str]) -> int:
     with _conn() as c:
         cur = c.execute(
