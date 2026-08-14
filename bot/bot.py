@@ -25,11 +25,11 @@ BASE = Path(__file__).resolve().parent
 
 if cfg.PROXY:
     _session = AiohttpSession(proxy=cfg.PROXY)
-    bot = Bot(token=cfg.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    bot = Bot(token=cfg.BOT_TOKEN, default=DefaultBotProperties(parse_mode=None),
               session=_session)
     print(f"Подключение через прокси: {cfg.PROXY.split('@')[-1]}")
 else:
-    bot = Bot(token=cfg.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = Bot(token=cfg.BOT_TOKEN, default=DefaultBotProperties(parse_mode=None))
 dp = Dispatcher()
 
 
@@ -261,8 +261,8 @@ async def cmd_id(message: Message) -> None:
         verdict = "❌ НЕ совпадает с HOST_ID — админ-команды (/stats и т.д.) молчат. " \
                   "Впишь свой реальный id в .env как HOST_ID и перезапусти бота."
     await message.answer(
-        f"Твой Telegram ID: <code>{uid}</code>\n"
-        f"HOST_ID в .env: <code>{cfg.HOST_ID}</code>\n{verdict}"
+        f"Твой Telegram ID: {uid}\n"
+        f"HOST_ID в .env: {cfg.HOST_ID}\n{verdict}"
     )
 
 
