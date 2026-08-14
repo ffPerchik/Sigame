@@ -217,8 +217,8 @@ async def _submit_for_approval(uid: int, message: Message) -> None:
 @dp.message(F.content_type.in_({"text", "photo", "document", "voice", "video"}))
 async def on_message(message: Message) -> None:
     uid = message.from_user.id
-    if uid == cfg.HOST_ID:
-        return
+    # (раньше здесь был запрет ведущему слать ответы — убран: теперь ведущий
+    #  может тестировать квест за игрока тем же аккаунтом)
     if message.text and message.text.startswith("/"):
         await message.answer("Неизвестная команда. /help")
         return
