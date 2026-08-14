@@ -10,6 +10,7 @@ from pathlib import Path
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.filters import BaseFilter, Command, CommandStart
 from aiogram.types import (
@@ -21,7 +22,14 @@ import db
 import quest
 
 BASE = Path(__file__).resolve().parent
-bot = Bot(token=cfg.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+
+if cfg.PROXY:
+    _session = AiohttpSession(proxy=cfg.PROXY)
+    bot = Bot(token=cfg.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+              session=_session)
+    print(f"Подключение через прокси: {cfg.PROXY.split('@')[-1]}")
+else:
+    bot = Bot(token=cfg.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
 

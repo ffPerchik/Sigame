@@ -23,6 +23,11 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 HOST_ID = int(os.environ.get("HOST_ID", "0"))
 ENTRY_CODE = os.environ.get("ENTRY_CODE", "ZENGAME2026")
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "").lstrip("@")
+# Прокси для обхода блокировки api.telegram.org (Россия). Форматы:
+#   http://host:port          http://user:pass@host:port
+#   socks5://host:port        socks5://user:pass@host:port
+# Пусто — прямое подключение.
+PROXY = os.environ.get("PROXY", "").strip()
 DB_PATH = os.environ.get("DB_PATH") or str(BASE / "quest.db")
 QUEST_FILE = os.environ.get("QUEST_FILE") or str(BASE / "quest" / "stages.yaml")
 NOTIFY_HOST = os.environ.get("NOTIFY_HOST", "1") == "1"
