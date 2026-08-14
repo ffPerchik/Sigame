@@ -46,6 +46,10 @@ def init_db() -> None:
             );
             """
         )
+        # миграции (для уже существующей БД)
+        cols = [r["name"] for r in c.execute("PRAGMA table_info(players)")]
+        if "banked" not in cols:
+            c.execute("ALTER TABLE players ADD COLUMN banked INTEGER DEFAULT 0")
 
 
 def register(user_id: int, username: str, name: str, stage: str) -> None:
@@ -82,6 +86,17 @@ def mark_finished(user_id: int) -> None:
             "UPDATE players SET finished_at=COALESCE(finished_at, ?) WHERE user_id=?",
             (time.time(), user_id),
         )
+
+
+def add_banked(user_id: int, n: int = 1) -> int:
+    """Начислить «подсказку» для грядущей Игры (награда за пройденный этап)."""
+    with _conn() as c:
+        c.execute(
+            "UPDATE players SET banked=COALESCE(banked,0)+? WHERE user_id=?",
+            (n, user_id),
+        )
+        row = c.execute("SELECT banked FROM players WHERE user_id=?", (user_id,)).fetchone()
+        return row["banked"] if row else 0
 
 
 def add_submission(user_id: int, stage: str, kind: str, payload: str, file_id: Optional[str]) -> int:
