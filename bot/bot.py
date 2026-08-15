@@ -1,9 +1,10 @@
 """Telegram-бот квеста: трекинг прогресса игроков.
 
-Игроки: /start <код> — старт, далее шлют ответы/фото. Где stage.mode=auto — бот
-проверяет сам; где approve — сабмит уходит ведущему на апрув (кнопки/команды).
-QR на локациях = deep link t.me/bot?start=CODE (или ввод кода вручную).
-Ведущий (HOST_ID): /stats /pending /setstage /broadcast /reset + кнопки на сабмитах.
+Все тексты сообщений вынесены в texts.py — меняй формулировки там, логику не трогай.
+Игроки: /start <код> — старт, далее шлют ответы/фото. mode=auto — бот проверяет сам;
+approve — сабмит уходит ведущему на апрув. QR на локациях = deep link.
+Ведущий (HOST_ID): /stats /pending /addhint /sethint /setstage /broadcast /reset + кнопки.
+Подсказки: ЗАРАБАТЫВАЮТСЯ в «Своей игре» (ведущий начисляет /addhint), ТРАТЯТСЯ в квесте (/hint).
 """
 import asyncio
 from pathlib import Path
@@ -11,7 +12,6 @@ from pathlib import Path
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
-from aiogram.enums import ParseMode
 from aiogram.filters import BaseFilter, Command, CommandStart
 from aiogram.types import (
     CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message,
@@ -20,6 +20,7 @@ from aiogram.types import (
 import config as cfg
 import db
 import quest
+import texts as T
 
 BASE = Path(__file__).resolve().parent
 
@@ -27,7 +28,7 @@ if cfg.PROXY:
     _session = AiohttpSession(proxy=cfg.PROXY)
     bot = Bot(token=cfg.BOT_TOKEN, default=DefaultBotProperties(parse_mode=None),
               session=_session)
-    print(f"Подключение через прокси: {cfg.PROXY.split('@')[-1]}")
+    print(T.PROXY_NOTE.format(proxy=cfg.PROXY.split("@")[-1]))
 else:
     bot = Bot(token=cfg.BOT_TOKEN, default=DefaultBotProperties(parse_mode=None))
 dp = Dispatcher()
@@ -38,26 +39,6 @@ class HostFilter(BaseFilter):
         return message.from_user and message.from_user.id == cfg.HOST_ID
 
 
-PLAYER_HELP = (
-    "Я — бот квеста. Каждый сам за себя.\n"
-    "• Шли ответы текстом (на стадиях с шифрами).\n"
-    "• На стадиях «докажи» — пришли фото/файл, ждём ведущего.\n"
-    "• QR на локации можно отсканировать (откроется ссылка на меня) или ввести код текстом.\n"
-    "Команды: /progress — где я, /hint — подсказка (влияет на счёт), /help."
-)
-ADMIN_HELP = (
-    "Команды ведущего:\n"
-    "/stats — прогресс всех игроков (+ id и баланс подсказок)\n"
-    "/pending — очередь на апрув\n"
-    "/addhint <@username или id> <n> — начислить игроку подсказки (сколько он ЗАРАБОТАЛ в «Своей игре»)\n"
-    "/sethint <@username или id> <n> — установить точный баланс подсказок\n"
-    "/setstage <id> <stage_id> — перевести игрока вручную\n"
-    "/broadcast <текст> — сообщение всем\n"
-    "/reset <id> — сбросить игрока в начало\n"
-    "На сабмитах есть кнопки ✅/❌ (можно и /approve, /reject)."
-)
-
-
 def _resolve(arg: str):
     """@username или числовой id -> user_id (или None)."""
     arg = (arg or "").strip().lstrip("@")
@@ -65,6 +46,10 @@ def _resolve(arg: str):
         uid = int(arg)
         return uid if db.get_player(uid) else None
     return db.find_by_username(arg)
+
+
+def _name(p) -> str:
+    return f"{p['name']} (@{p['username'] or '—'})"
 
 
 # ----------------- вспомогательные -----------------
@@ -79,7 +64,7 @@ async def notify_host(text: str) -> None:
 async def send_stage(uid: int, stage_id: str) -> None:
     st = quest.get_stage(stage_id)
     if not st:
-        await bot.send_message(uid, f"(стадия «{stage_id}» не найдена — скажи ведущему)")
+        await bot.send_message(uid, T.STAGE_MISSING.format(stage=stage_id))
         return
     text = (st.get("text") or "").strip()
     img = st.get("image")
@@ -108,57 +93,19 @@ async def advance(uid: int) -> None:
     db.log_event(uid, "advance", f"{cur} -> {nxt}")
     name = player["name"] or player["username"] or str(uid)
     if cfg.NOTIFY_HOST:
-        await notify_host(f"➡️ {name}: «{cur}» → «{nxt}»")
+        await notify_host(T.ADVANCE_HOST.format(name=name, cur=cur, nxt=nxt))
     await send_stage(uid, nxt)
     nst = quest.get_stage(nxt)
     if nst and nst.get("mode") == "info":
-        await advance(uid)  # информационная стадия — авто-переход дальше
+        await advance(uid)
     if quest.is_finish(nxt):
         db.mark_finished(uid)
         p2 = db.get_player(uid)
         b = (p2["banked"] or 0) if p2 else 0
-        await bot.send_message(uid, f"📊 Квест пройден! У тебя осталось {b} подсказок.")
+        await bot.send_message(uid, T.FINISH_PLAYER.format(bal=b))
         if cfg.NOTIFY_HOST:
-            await notify_host(f"🏆 {name} ЗАВЕРШИЛ квест! Осталось подсказок: {b}")
+            await notify_host(T.FINISH_HOST.format(name=name, bal=b))
 
-
-def _name(p) -> str:
-    return f"{p['name']} (@{p['username'] or '—'})"
-
-
-# ----------------- игрок: /start -----------------
-
-@dp.message(CommandStart())
-async def cmd_start(message: Message, command: CommandStart) -> None:
-    uid = message.from_user.id
-    payload = (command.args or "").strip()
-    player = db.get_player(uid)
-
-    if payload and payload == quest.entry_code():
-        if player is None:
-            first = quest.first_stage()
-            db.register(uid, message.from_user.username or "", message.from_user.full_name, first)
-            db.log_event(uid, "register")
-            await message.answer("🔑 Квест начался. Удачи — каждый сам за себя.")
-            await send_stage(uid, first)
-            if quest.get_stage(first) and quest.get_stage(first).get("mode") == "info":
-                await advance(uid)
-            await notify_host(
-                f"🆕 Новый игрок: {message.from_user.full_name} (@{message.from_user.username or '—'})"
-            )
-        else:
-            await message.answer("Ты уже в квесте. /progress — где ты сейчас.")
-        return
-
-    if player is None:
-        await message.answer("Нужен код из квеста (из START.txt внутри пакета). Найди его и пришли /start <код>.")
-        return
-
-    # payload — QR-код или попытка ответа на текущую стадию
-    await _try_answer(uid, message, payload)
-
-
-# ----------------- игрок: ответ/сабмит -----------------
 
 async def _try_answer(uid: int, message: Message, text: str) -> None:
     player = db.get_player(uid)
@@ -166,10 +113,10 @@ async def _try_answer(uid: int, message: Message, text: str) -> None:
     if not st or st.get("mode") != "auto":
         return
     if quest.validate(st.get("accept", []), text):
-        await message.answer("✅ Верно!")
+        await message.answer(T.CORRECT)
         await advance(uid)
     else:
-        await message.answer("❌ Неверно. Попробуй ещё. /hint — подсказка (стоит 1 подсказку).")
+        await message.answer(T.WRONG)
 
 
 async def _submit_for_approval(uid: int, message: Message) -> None:
@@ -194,20 +141,50 @@ async def _submit_for_approval(uid: int, message: Message) -> None:
         InlineKeyboardButton(text="✅ Одобрить", callback_data=f"appr:{uid}:{sub_id}"),
         InlineKeyboardButton(text="❌ Отклонить", callback_data=f"rej:{uid}:{sub_id}"),
     ]])
-    caption = (f"📥 Сабмит: {_name(player)}\n"
-               f"Стадия: «{stage_id}»\n"
-               f"Текст: {payload or '(нет)'}")
+    caption = T.SUBMIT_RELAY.format(name=_name(player), stage=stage_id, payload=payload or "(нет)")
     try:
         if kind in ("photo", "video") and file_id:
-            await bot.send_photo(cfg.HOST_ID, file_id, caption=caption, reply_markup=kb) if kind == "photo" \
-                else await bot.send_video(cfg.HOST_ID, file_id, caption=caption, reply_markup=kb)
+            if kind == "photo":
+                await bot.send_photo(cfg.HOST_ID, file_id, caption=caption, reply_markup=kb)
+            else:
+                await bot.send_video(cfg.HOST_ID, file_id, caption=caption, reply_markup=kb)
         elif kind in ("document", "voice") and file_id:
             await bot.send_document(cfg.HOST_ID, file_id, caption=caption, reply_markup=kb)
         else:
             await bot.send_message(cfg.HOST_ID, caption, reply_markup=kb)
     except Exception as e:
-        await bot.send_message(cfg.HOST_ID, f"📥 Сабмит: {_name(player)} ({stage_id}) — не удалось переслать: {e}")
-    await message.answer("📨 Отправлено ведущему на проверку. Жди.")
+        await bot.send_message(cfg.HOST_ID, T.SUBMIT_RELAY_FAIL.format(
+            name=_name(player), stage=stage_id, err=e))
+    await message.answer(T.SUBMIT_SENT)
+
+
+# ----------------- игрок: /start -----------------
+
+@dp.message(CommandStart())
+async def cmd_start(message: Message, command: CommandStart) -> None:
+    uid = message.from_user.id
+    payload = (command.args or "").strip()
+    player = db.get_player(uid)
+
+    if payload and payload == quest.entry_code():
+        if player is None:
+            first = quest.first_stage()
+            db.register(uid, message.from_user.username or "", message.from_user.full_name, first)
+            db.log_event(uid, "register")
+            await message.answer(T.WELCOME)
+            await send_stage(uid, first)
+            if quest.get_stage(first) and quest.get_stage(first).get("mode") == "info":
+                await advance(uid)
+            await notify_host(T.NEW_PLAYER.format(
+                name=message.from_user.full_name, username=message.from_user.username or "—"))
+        else:
+            await message.answer(T.ALREADY_IN_QUEST)
+        return
+
+    if player is None:
+        await message.answer(T.NEED_CODE)
+        return
+    await _try_answer(uid, message, payload)
 
 
 # ----------------- игрок: команды -----------------
@@ -216,12 +193,12 @@ async def _submit_for_approval(uid: int, message: Message) -> None:
 async def cmd_progress(message: Message) -> None:
     p = db.get_player(message.from_user.id)
     if not p:
-        return await message.answer("Ты ещё не в квесте.")
+        return await message.answer(T.NOT_IN_QUEST)
     bal = p["banked"] or 0
     if p["finished_at"]:
-        await message.answer(f"🏁 Ты прошёл квест! Осталось подсказок: {bal}.")
+        await message.answer(T.PROGRESS_FINISHED.format(bal=bal))
     else:
-        await message.answer(f"Ты на стадии: «{p['stage']}». Осталось подсказок: {bal}.")
+        await message.answer(T.PROGRESS_STAGE.format(stage=p["stage"], bal=bal))
 
 
 @dp.message(Command("hint"))
@@ -229,46 +206,35 @@ async def cmd_hint(message: Message) -> None:
     uid = message.from_user.id
     p = db.get_player(uid)
     if not p:
-        return await message.answer("Сначала /start <код>.")
+        return await message.answer(T.HINT_NEED_START)
     st = quest.get_stage(p["stage"])
     hint = st.get("hint") if st else None
     if not hint:
-        return await message.answer("На эту стадию подсказки нет.")
+        return await message.answer(T.NO_HINT_HERE)
     bal = p["banked"] or 0
     if bal <= 0:
-        return await message.answer("У тебя нет подсказок. Подсказки зарабатывают в «Своей игре», а здесь — тратят.")
+        return await message.answer(T.NO_HINTS_LEFT)
     db.add_banked(uid, -1)
-    await message.answer(f"💡 {hint}\n\n(Потрачена 1 подсказка. Осталось: {bal-1}.)")
+    await message.answer(T.HINT_USED.format(hint=hint, remaining=bal - 1))
     if cfg.NOTIFY_HOST:
-        await notify_host(f"💡 {_name(p)} потратил подсказку на «{p['stage']}» (осталось {bal-1})")
+        await notify_host(T.HINT_HOST.format(name=_name(p), stage=p["stage"], remaining=bal - 1))
 
 
 @dp.message(Command("help"))
 async def cmd_help(message: Message) -> None:
-    if message.from_user.id == cfg.HOST_ID:
-        await message.answer(ADMIN_HELP)
-    else:
-        await message.answer(PLAYER_HELP)
+    await message.answer(T.ADMIN_HELP if message.from_user.id == cfg.HOST_ID else T.PLAYER_HELP)
 
 
 @dp.message(Command("id"))
 async def cmd_id(message: Message) -> None:
-    """Диагностика: показывает id отправителя и сравнивает с HOST_ID."""
     uid = message.from_user.id
-    if uid == cfg.HOST_ID:
-        verdict = "✅ совпадает — ты ведущий, админ-команды работают"
-    else:
-        verdict = "❌ НЕ совпадает с HOST_ID — админ-команды (/stats и т.д.) молчат. " \
-                  "Впишь свой реальный id в .env как HOST_ID и перезапусти бота."
-    await message.answer(
-        f"Твой Telegram ID: {uid}\n"
-        f"HOST_ID в .env: {cfg.HOST_ID}\n{verdict}"
-    )
+    verdict = T.ID_VERDICT_HOST if uid == cfg.HOST_ID else T.ID_VERDICT_NOT_HOST
+    await message.answer(T.ID_TEMPLATE.format(uid=uid, host=cfg.HOST_ID, verdict=verdict))
 
 
 @dp.message(Command("ping"))
 async def cmd_ping(message: Message) -> None:
-    await message.answer("🏓 pong — бот жив и отвечает")
+    await message.answer(T.PONG)
 
 
 # ----------------- ведущий: апрув (кнопки) -----------------
@@ -276,33 +242,33 @@ async def cmd_ping(message: Message) -> None:
 @dp.callback_query(F.data.startswith("appr:"))
 async def cb_appr(cq: CallbackQuery) -> None:
     if cq.from_user.id != cfg.HOST_ID:
-        return await cq.answer("Только ведущий.", show_alert=True)
+        return await cq.answer(T.ONLY_HOST, show_alert=True)
     _, uid, sub_id = cq.data.split(":")
     uid, sub_id = int(uid), int(sub_id)
     db.set_submission_status(sub_id, "approved")
     db.log_event(uid, "approved", f"sub#{sub_id}")
-    await cq.answer("Одобрено ✅")
+    await cq.answer(T.APPROVED_ALERT)
     try:
         await cq.message.edit_reply_markup(reply_markup=None)
     except Exception:
         pass
-    await bot.send_message(uid, "✅ Засчитано! Двигаемся дальше.")
+    await bot.send_message(uid, T.APPROVED_TO_PLAYER)
     await advance(uid)
 
 
 @dp.callback_query(F.data.startswith("rej:"))
 async def cb_rej(cq: CallbackQuery) -> None:
     if cq.from_user.id != cfg.HOST_ID:
-        return await cq.answer("Только ведущий.", show_alert=True)
+        return await cq.answer(T.ONLY_HOST, show_alert=True)
     _, uid, sub_id = cq.data.split(":")
     db.set_submission_status(int(sub_id), "rejected")
     db.log_event(int(uid), "rejected", f"sub#{sub_id}")
-    await cq.answer("Отклонено ❌")
+    await cq.answer(T.REJECTED_ALERT)
     try:
         await cq.message.edit_reply_markup(reply_markup=None)
     except Exception:
         pass
-    await bot.send_message(int(uid), "❌ Не засчитано. Попробуй иначе или пришли другое доказательство.")
+    await bot.send_message(int(uid), T.REJECTED_TO_PLAYER)
 
 
 # ----------------- ведущий: команды -----------------
@@ -311,14 +277,13 @@ async def cb_rej(cq: CallbackQuery) -> None:
 async def cmd_stats(message: Message) -> None:
     rows = db.all_players()
     if not rows:
-        return await message.answer("Игроков пока нет.")
-    lines = ["📊 Прогресс (подсказки заработаны в «Своей игре», тратятся в квесте):"]
+        return await message.answer(T.STATS_EMPTY)
+    lines = [T.STATS_HEADER]
     for r in rows:
         mark = "🏁" if r["finished_at"] else "🚶"
-        lines.append(
-            f"{mark} {r['name']} (@{r['username'] or '—'}) [id:{r['user_id']}]: "
-            f"«{r['stage'] or '—'}» | подсказок: {r['banked'] or 0}"
-        )
+        lines.append(T.STATS_LINE.format(
+            mark=mark, name=r["name"], username=r["username"] or "—",
+            uid=r["user_id"], stage=r["stage"] or "—", bal=r["banked"] or 0))
     await message.answer("\n".join(lines))
 
 
@@ -326,10 +291,12 @@ async def cmd_stats(message: Message) -> None:
 async def cmd_pending(message: Message) -> None:
     rows = db.pending()
     if not rows:
-        return await message.answer("Очередь пуста.")
-    lines = ["⏳ На проверке:"]
+        return await message.answer(T.PENDING_EMPTY)
+    lines = [T.PENDING_HEADER]
     for r in rows:
-        lines.append(f"#{r['id']} {r['name']} (@{r['username'] or '—'}): «{r['stage']}» — {r['payload'] or r['kind']}")
+        lines.append(T.PENDING_LINE.format(
+            sid=r["id"], name=r["name"], username=r["username"] or "—",
+            stage=r["stage"], payload=r["payload"] or r["kind"]))
     await message.answer("\n".join(lines))
 
 
@@ -337,20 +304,20 @@ async def cmd_pending(message: Message) -> None:
 async def cmd_addhint(message: Message, command: Command) -> None:
     args = (command.args or "").split()
     if len(args) < 2:
-        return await message.answer("/addhint <@username или id> <число>  (число может быть отрицательным — списать)")
+        return await message.answer(T.ADDHINT_USAGE)
     target = _resolve(args[0])
     if not target:
-        return await message.answer("Игрок не найден. /stats — список с id.")
+        return await message.answer(T.PLAYER_NOT_FOUND)
     try:
         n = int(args[1])
     except ValueError:
-        return await message.answer("Число некорректно.")
+        return await message.answer(T.BAD_NUMBER)
     p = db.get_player(target)
     b = db.add_banked(target, n)
-    sign = f"{'начислено' if n>=0 else 'списано'} {abs(n)}"
-    await message.answer(f"✅ {p['name']}: {sign}. Теперь подсказок: {b}.")
+    sign = (T.SIGN_CREDIT if n >= 0 else T.SIGN_DEBIT).format(n=abs(n))
+    await message.answer(T.ADDHINT_RESULT.format(name=p["name"], sign=sign, bal=b))
     try:
-        await bot.send_message(target, f"📊 Твой баланс подсказок изменился ({sign}). Теперь: {b}.")
+        await bot.send_message(target, T.BANK_CHANGED.format(sign=sign, bal=b))
     except Exception:
         pass
 
@@ -359,19 +326,19 @@ async def cmd_addhint(message: Message, command: Command) -> None:
 async def cmd_sethint(message: Message, command: Command) -> None:
     args = (command.args or "").split()
     if len(args) < 2:
-        return await message.answer("/sethint <@username или id> <число>")
+        return await message.answer(T.SETHINT_USAGE)
     target = _resolve(args[0])
     if not target:
-        return await message.answer("Игрок не найден. /stats — список с id.")
+        return await message.answer(T.PLAYER_NOT_FOUND)
     try:
         n = int(args[1])
     except ValueError:
-        return await message.answer("Число некорректно.")
+        return await message.answer(T.BAD_NUMBER)
     p = db.get_player(target)
     b = db.set_banked(target, n)
-    await message.answer(f"✅ {p['name']}: баланс подсказок установлен = {b}.")
+    await message.answer(T.SETHINT_RESULT.format(name=p["name"], bal=b))
     try:
-        await bot.send_message(target, f"📊 Твой баланс подсказок: {b}.")
+        await bot.send_message(target, T.BANK_SET_PLAYER.format(bal=b))
     except Exception:
         pass
 
@@ -380,20 +347,20 @@ async def cmd_sethint(message: Message, command: Command) -> None:
 async def cmd_setstage(message: Message, command: Command) -> None:
     args = (command.args or "").split()
     if len(args) < 2:
-        return await message.answer("/setstage <user_id> <stage_id>")
+        return await message.answer(T.SETSTAGE_USAGE)
     uid, stage = int(args[0]), args[1]
     if not quest.get_stage(stage):
-        return await message.answer(f"Стадии «{stage}» нет в квесте.")
+        return await message.answer(T.STAGE_NOT_FOUND.format(stage=stage))
     db.set_stage(uid, stage)
     await send_stage(uid, stage)
-    await message.answer(f"✅ {uid} переведён на «{stage}».")
+    await message.answer(T.SETSTAGE_RESULT.format(uid=uid, stage=stage))
 
 
 @dp.message(HostFilter(), Command("broadcast"))
 async def cmd_broadcast(message: Message, command: Command) -> None:
     text = command.args
     if not text:
-        return await message.answer("/broadcast <текст>")
+        return await message.answer(T.BROADCAST_USAGE)
     n = 0
     for r in db.all_players():
         try:
@@ -401,75 +368,73 @@ async def cmd_broadcast(message: Message, command: Command) -> None:
             n += 1
         except Exception:
             pass
-    await message.answer(f"Разослано {n} игрокам.")
+    await message.answer(T.BROADCAST_DONE.format(n=n))
 
 
 @dp.message(HostFilter(), Command("reset"))
 async def cmd_reset(message: Message, command: Command) -> None:
     args = (command.args or "").split()
     if not args:
-        return await message.answer("/reset <user_id>")
+        return await message.answer(T.RESET_USAGE)
     uid = int(args[0])
     first = quest.first_stage()
     db.set_stage(uid, first)
-    await message.answer(f"Сброшен {uid} → «{first}».")
+    await message.answer(T.RESET_DONE.format(uid=uid, stage=first))
 
 
 @dp.message(HostFilter(), Command("approve"))
 async def cmd_approve(message: Message, command: Command) -> None:
     args = (command.args or "").split()
     if not args:
-        return await message.answer("/approve <user_id> (одобряет последний pending сабмит игрока)")
+        return await message.answer(T.APPROVE_USAGE)
     uid = int(args[0])
     for r in db.pending():
         if r["user_id"] == uid:
             db.set_submission_status(r["id"], "approved")
             db.log_event(uid, "approved", f"sub#{r['id']}")
-            await bot.send_message(uid, "✅ Засчитано!")
+            await bot.send_message(uid, T.APPROVED_TO_PLAYER)
             await advance(uid)
-            return await message.answer("Одобрено.")
-    await message.answer("У этого игрока нет pending-сабмитов.")
+            return await message.answer(T.APPROVE_OK)
+    await message.answer(T.NO_PENDING)
 
 
 @dp.message(HostFilter(), Command("reject"))
 async def cmd_reject_cmd(message: Message, command: Command) -> None:
     args = (command.args or "").split(maxsplit=1)
     if not args:
-        return await message.answer("/reject <user_id> [причина]")
+        return await message.answer(T.REJECT_USAGE)
     uid = int(args[0])
-    reason = args[1] if len(args) > 1 else "не засчитано"
+    reason = args[1] if len(args) > 1 else T.REJECT_DEFAULT_REASON
     for r in db.pending():
         if r["user_id"] == uid:
             db.set_submission_status(r["id"], "rejected")
-            await bot.send_message(uid, f"❌ {reason}")
-            return await message.answer("Отклонено.")
-    await message.answer("Нет pending-сабмита.")
+            await bot.send_message(uid, T.REJECT_PLAYER.format(reason=reason))
+            return await message.answer(T.REJECT_OK)
+    await message.answer(T.NO_PENDING_2)
 
 
-# ----------------- универсальный приёмник (registriruem ПОСЛЕДНИМ!) -----------------
-# Ловит ответы/фото игроков. Стоит в самом конце, чтобы командные хендлеры выше
-# перехватывали свои команды (/help, /stats, ...), а не этот catch-all.
+# ----------------- универсальный приёмник (последний!) -----------------
 
 @dp.message(F.content_type.in_({"text", "photo", "document", "voice", "video"}))
 async def on_message(message: Message) -> None:
     uid = message.from_user.id
     if message.text and message.text.startswith("/"):
-        await message.answer("Неизвестная команда. /help")
+        await message.answer(T.UNKNOWN_COMMAND)
         return
     player = db.get_player(uid)
     if player is None:
-        await message.answer("Сначала /start <код из квеста>.")
+        await message.answer(T.START_FIRST)
         return
     st = quest.get_stage(player["stage"])
     if not st or st.get("mode") == "finish":
-        await message.answer("Ты уже прошёл квест 🏆")
+        await message.answer(T.ALREADY_FINISHED)
         return
     if st.get("mode") == "auto":
         await _try_answer(uid, message, message.text or message.caption or "")
     elif st.get("mode") == "approve":
         await _submit_for_approval(uid, message)
     else:
-        await message.answer("Жди — это информационная стадия или нужна проверка. /hint")
+        await message.answer(T.WAIT_INFO)
 
 
 # ----------------- main -----------------
@@ -478,7 +443,7 @@ async def main() -> None:
     db.init_db()
     await bot.delete_webhook(drop_pending_updates=True)
     me = await bot.get_me()
-    print(f"Бот @{me.username} запущен. HOST_ID={cfg.HOST_ID}. Жду игроков.")
+    print(T.STARTUP.format(username=me.username, host=cfg.HOST_ID))
     await dp.start_polling(bot)
 
 
