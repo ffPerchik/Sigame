@@ -1,0 +1,11 @@
+# Scratch / build artifacts
+__pycache__/
+*.pyc
+image-search/
+*.tmp
+
+# bot runtime artifacts
+bot/.env
+bot/quest.db
+bot/qr/
+bot/__pycache__/
