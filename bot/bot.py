@@ -181,6 +181,10 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
             await message.answer(T.ALREADY_IN_QUEST)
         return
 
+    if not payload:
+        await message.answer(T.ALREADY_IN_QUEST if player is not None else T.NEED_CODE)
+        return
+
     if player is None:
         await message.answer(T.NEED_CODE)
         return
