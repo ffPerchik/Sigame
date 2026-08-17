@@ -67,14 +67,23 @@ async def send_stage(uid: int, stage_id: str) -> None:
         await bot.send_message(uid, T.STAGE_MISSING.format(stage=stage_id))
         return
     text = (st.get("text") or "").strip()
-    img = st.get("image")
-    if img:
-        path = Path(img) if Path(img).is_absolute() else BASE / img
+    media_dir = BASE / "quest" / "images"
+    # Ищем поле с медиа: photo > audio > video > document. Каждое — отдельный файл.
+    for field, sender, kind_label in (
+        ("image",    bot.send_photo,    "photo"),
+        ("audio",    bot.send_audio,    "audio"),
+        ("video",    bot.send_video,    "video"),
+        ("document", bot.send_document, "document"),
+    ):
+        fn = st.get(field)
+        if not fn:
+            continue
+        path = Path(fn) if Path(fn).is_absolute() else media_dir / fn
         try:
-            await bot.send_photo(uid, FSInputFile(path), caption=text)
+            await sender(uid, FSInputFile(path), caption=text)
             return
-        except Exception:
-            pass
+        except Exception as e:
+            print(T.MEDIA_FAIL.format(kind=kind_label, path=path, err=e))
     await bot.send_message(uid, text)
 
 
@@ -202,7 +211,9 @@ async def cmd_progress(message: Message) -> None:
     if p["finished_at"]:
         await message.answer(T.PROGRESS_FINISHED.format(bal=bal))
     else:
-        await message.answer(T.PROGRESS_STAGE.format(stage=p["stage"], bal=bal))
+        st = quest.get_stage(p["stage"])
+        question = (st.get("text") or "").strip() if st else ""
+        await message.answer(T.PROGRESS_STAGE.format(stage=p["stage"], bal=bal, question=question))
 
 
 @dp.message(Command("hint"))

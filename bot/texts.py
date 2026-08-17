@@ -44,7 +44,7 @@ SUBMIT_RELAY_FAIL = "Сабмит: {name} ({stage}) — не удалось пе
 
 # ============ ПРОГРЕСС / ПОДСКАЗКИ (КВЕСТ) ============
 NOT_IN_QUEST = "Ты ещё не в квесте."
-PROGRESS_STAGE = "Ты на стадии: «{stage}». Осталось подсказок: {bal}."
+PROGRESS_STAGE = "Ты на стадии: «{stage}». Осталось подсказок: {bal}.\n\n── ВОПРОС ──\n{question}"
 PROGRESS_FINISHED = "Ты прошёл квест! С остатком подсказов: {bal}"
 HINT_NEED_START = "Сначала /start <код>."
 NO_HINT_HERE = "На эту стадию подсказки нет. Напиши лично ведущему"
@@ -110,6 +110,14 @@ REJECT_DEFAULT_REASON = "не засчитано"
 REJECT_PLAYER = "❌ {reason}"
 REJECT_OK = "Отклонено."
 NO_PENDING_2 = "Нет pending-сабмита."
+
+# ============ ЗАГРУЗКА КАРТИНОК В СТАДИЯХ ============
+IMG_USAGE = "В стадии stages.yaml укажи «image: имя_файла.jpg» — файл клади в bot/quest/images/"
+IMG_NEED_REPLY = "Загрузи картинку в bot/quest/images/ и пропиши её имя в стадии как «image: файл.jpg»"
+IMG_FAIL = "⚠️ Не удалось отправить картинку {path}: {err}"
+IMG_OK = "✅ Картинка отправлена игроку вместе с текстом стадии."
+# Универсальное сообщение для любого медиа (image/audio/video/document).
+MEDIA_FAIL = "⚠️ Не удалось отправить {kind} {path}: {err}"
 
 # ============ КОНСОЛЬ (не игрокам) ============
 STARTUP = "Бот @{username} запущен. HOST_ID={host}. Жду игроков."
