@@ -1,0 +1,55 @@
+# =============================================================================
+#  Квест «Чистый Cicada». Идёт ПОСЛЕ «Своей игры»: игроки приносят заработанные
+#  в «Своей игре» подсказки и ТРАТЯТ их здесь (команда /hint стоит 1 подсказку;
+#  при нуле — отказ). Ведущий начисляет заработанное через /addhint.
+#
+#  mode: info / auto / approve / finish   (см. README.md)
+#  qr: true — локация с QR; accept[0] — код в QR (deep link t.me/<bot>?start=CODE)
+#  accept: принимаемые ответы (регистр/ё/пунктуация не важны)
+#  Шифры — русский алфавит БЕЗ Ё (32 буквы): АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ
+# =============================================================================
+
+entry_code: "ZENGAME2026"
+start: intro
+
+stages:
+  intro:
+    mode: info
+    text: |
+      Бугагашки, ты начал, ты просто легенда, стартуем, ёлы-палы
+    next: test
+
+  test:
+    mode: auto
+    text: |
+      Вбей: 123
+    accept: ["123"]
+    hint: ""
+    next: qr-test
+
+  qr-test:
+    mode: auto
+    qr: true
+    text: |
+      Соскань qr
+    accept: ["GATE1"]
+    next: approve-test
+
+  approve-test:
+    mode: approve
+    text: |
+      Пришли любое фото
+    next: image-test
+
+  image-test:
+    mode: auto
+    image: Снимок экрана 2026-08-17 225436.png
+    text: |
+      посмотри на фотку и напиши 123
+    accept: ["123"]
+    next: finish
+
+  finish:
+    mode: finish
+    text: |
+      Йоу-йоу-йоу, с тестами покончено
