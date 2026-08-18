@@ -183,9 +183,13 @@ def draw_node_card(draw, cx, cy, num, name, cryptic, color):
         lw, _ = text_size(draw, line, fs)
         draw.text((cx - lw / 2, fnt_y + 46 + i * 22), line, fill=DIM, font=fs)
 
-    # засекреченный «замо́к»: ? символ над правым углом
-    fl = f(36, bold=True)
-    draw.text((x1 - 50, y0 - 8), "? ?", fill=GOLD, font=fl)
+    # засекреченный «замо́к»: один ? в золотой скобе-пилюле
+    fl = f(20, bold=True)
+    px = x1 - 38
+    py = y0 + 18
+    draw.rounded_rectangle((px - 4, py - 4, px + 24, py + 24),
+                           radius=12, fill=PANEL, outline=GOLD, width=2)
+    draw.text((px, py - 2), "?", fill=GOLD, font=fl)
 
 
 def render(out_path: Path) -> None:
@@ -220,20 +224,11 @@ def render(out_path: Path) -> None:
     cx, cy = W / 2, H / 2 + 20
     draw_central_emblem(draw, int(cx), int(cy))
 
-    # над печатью: «НОМЕР СЕАНСА · 0001» — мелкой готической меткой
+    # над печатью — мелкая капс-метка сеанса
     sidemark = f(13, bold=True)
-    side = СЕАНС if False else "SESSION · OPEN"   # noqa: keep literal
+    side = "SESSION  ·  CHANNEL  0xARGV-1001  ·  OPEN"
     sw2, _ = text_size(draw, side, sidemark)
-    draw.text(((W - sw2) / 2, cy - 220), side, fill=DIM, font=sidemark)
-
-    # под печатью: одна строка — «получено в эфире»
-    rx = f(13)
-    rec = "░ ПРИНЯТО ИЗ ЭФИРА ░    ── ARGV-NET ──    ░ СЕАНС #1 ░"
-    rw, _ = text_size(draw, rec, rx)
-    draw.text(((W - rw) / 2, cy + 95), rec, fill=GOLD_SOFT, font=rx)
-    rec2 = "шифрование · декодирование · анализ"
-    r2w, _ = text_size(draw, rec2, rx)
-    draw.text(((W - r2w) / 2, cy + 116), rec2, fill=DIM, font=rx)
+    draw.text(((W - sw2) / 2, 220), side, fill=DIM, font=sidemark)
 
     # === 6 узлов вокруг печати ===
     RY, RX = 410, 700
@@ -316,29 +311,38 @@ def render(out_path: Path) -> None:
         draw.text((W - 460 + kw, y), v, fill=PALE, font=f_left)
         y += 26
 
-    # === НИЖНИЙ БЛОК: когда / что ===
-    band_y = H - 130
-    draw.rounded_rectangle((60, band_y, W - 60, H - 60), 14,
+    # === НИЖНИЙ БЛОК: когда / что / итог ===
+    band_y = H - 170
+    band_end = H - 32
+    draw.rounded_rectangle((60, band_y, W - 60, band_end), 14,
                            fill=PANEL, outline=GOLD, width=2)
 
-    fs = f(18, bold=True)
-    # Левая панель — дата
-    draw.text((100, band_y + 22), "СТАРТ", fill=DIM, font=fs)
-    fd = f(34, bold=True)
-    draw.text((100, band_y + 44), "ВЫБЕРИ САМ", fill=GOLD, font=fd)
-    draw.text((100, band_y + 76), "и раздай троим друзьям", fill=PALE, font=fs)
+    label_font = f(16, bold=True)
+    title_font = f(28, bold=True)
+    sub_font = f(15)
 
-    # Центр
-    draw.text((W / 2 - 200, band_y + 22), "ВРЕМЯ", fill=DIM, font=fs)
-    draw.text((W / 2 - 200, band_y + 44), "СВОБОДНОЕ", fill=GOLD, font=fd)
-    draw.text((W / 2 - 200, band_y + 76), "хоть 40 минут,   хоть вся следующая неделя",
-              fill=PALE, font=fs)
+    col_w = (W - 120 - 120) / 3     # ширина одной колонки
+    cx_left = 110
+    cx_mid  = cx_left + col_w + 30
+    cx_right = cx_mid + col_w + 30
 
-    # Правая панель
-    draw.text((W - 380, band_y + 22), "ЦЕНА", fill=DIM, font=fs)
-    draw.text((W - 380, band_y + 44), "ТОЛЬКО", fill=GOLD, font=fd)
-    draw.text((W - 380, band_y + 76), "интерес · внимание · желание дойти до конца",
-              fill=PALE, font=fs)
+    # Колонка 1 — СТАРТ
+    draw.text((cx_left, band_y + 22),  "КОГДА",      fill=DIM,   font=label_font)
+    draw.text((cx_left, band_y + 46),  "КОГДА СКАЖЕШЬ", fill=GOLD,  font=title_font)
+    draw.text((cx_left, band_y + 86),  "раздай 3 кода-ссылки  →  /start ARGUS1001",
+              fill=PALE, font=sub_font)
+
+    # Колонка 2 — ВРЕМЯ
+    draw.text((cx_mid, band_y + 22),  "СКОЛЬКО",      fill=DIM,   font=label_font)
+    draw.text((cx_mid, band_y + 46),  "СВОБОДНО",     fill=GOLD,  font=title_font)
+    draw.text((cx_mid, band_y + 86),  "хоть 40 минут   ·   хоть вся следующая неделя",
+              fill=PALE, font=sub_font)
+
+    # Колонка 3 — ИТОГ
+    draw.text((cx_right, band_y + 22),  "ЗАЧЕМ",       fill=DIM,   font=label_font)
+    draw.text((cx_right, band_y + 46),  "ДОЙТИ ДО",    fill=GOLD,  font=title_font)
+    draw.text((cx_right, band_y + 86),  "6 фрагментов  →  одно послание Аргуса",
+              fill=PALE, font=sub_font)
 
     # финальная рамка
     draw.rectangle((2, 2, W - 3, H - 3), outline=EDGE, width=2)
