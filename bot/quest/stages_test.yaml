@@ -1,55 +1,107 @@
 # =============================================================================
-#  Квест «Чистый Cicada». Идёт ПОСЛЕ «Своей игры»: игроки приносят заработанные
-#  в «Своей игре» подсказки и ТРАТЯТ их здесь (команда /hint стоит 1 подсказку;
-#  при нуле — отказ). Ведущий начисляет заработанное через /addhint.
-#
-#  mode: info / auto / approve / finish   (см. README.md)
-#  qr: true — локация с QR; accept[0] — код в QR (deep link t.me/<bot>?start=CODE)
-#  accept: принимаемые ответы (регистр/ё/пунктуация не важны)
-#  Шифры — русский алфавит БЕЗ Ё (32 буквы): АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ
+#  Тестовый сценарий для проверки фич бота (хаб, медиа, все режимы).
+#  Загружается через ENV: QUEST_FILE=bot/quest/stages_test.yaml
+#  ENTRY_CODE=ZENGAME2026
 # =============================================================================
-
 entry_code: "ZENGAME2026"
-start: intro
+
+welcome:
+  text: |
+    ┌── TEST MODE ──┐
+    Это тестовый режим. Все фичи бота можно проверить здесь.
+    Жди апрува ведущего, потом — в хаб с кнопками.
+
+nodes:
+  N1: {label: "СНИМОК С КООРДИНАТОЙ", hint: "EXIF-фото"}
+  N2: {label: "ГОЛОС В СПЕКТРЕ", hint: "Аудио-спектрограмма"}
+  N3: {label: "ТЕСТ-МЕДИА", hint: "Картинка/аудио/видео"}
 
 stages:
-  intro:
+
+  start_gate:
+    mode: gate
+    text: |
+      Ожидай подтверждения ведущего (тестовый режим).
+
+  prologue:
     mode: info
     text: |
-      Бугагашки, ты начал, ты просто легенда, стартуем, ёлы-палы
-    next: test
+      ТЕСТОВЫЙ ПРОЛОГ
+      Сейчас ты попадёшь в хаб и сможешь выбрать узел.
+    next: hub
 
-  test:
-    mode: auto
+  # ---- N1: auto-ответ ----
+  N1_intro:
+    mode: info
     text: |
-      Вбей: 123
-    accept: ["123"]
-    hint: ""
-    next: qr-test
+      ТЕСТ: Узел N1
+      Просто введи слово «тест» (без кавычек).
+    next: N1_question
 
-  qr-test:
+  N1_question:
     mode: auto
-    qr: true
-    text: |
-      Соскань qr
-    accept: ["GATE1"]
-    next: approve-test
+    text: "Введи: тест"
+    accept:
+      - "тест"
+      - "ТЕСТ"
+      - "Тест"
+    hint: Попробуй написать «тест».
+    next: N1_fragment
 
-  approve-test:
+  N1_fragment:
+    mode: info
+    text: |
+      N1 пройден ✅
+    next: hub
+
+  # ---- N2: approve-сабмит ----
+  N2_intro:
+    mode: info
+    text: |
+      ТЕСТ: Узел N2 (апрув)
+      Пришли любое фото или текст — ведущий одобрит.
+    next: N2_approve
+
+  N2_approve:
     mode: approve
     text: |
-      Пришли любое фото
-    next: image-test
+      Пришли что-нибудь — ведущий проверит.
+    hint: Просто отправь сообщение :)
+    next: N2_fragment
 
-  image-test:
-    mode: auto
-    image: Снимок экрана 2026-08-17 225436.png
+  N2_fragment:
+    mode: info
     text: |
-      посмотри на фотку и напиши 123
-    accept: ["123"]
-    next: finish
+      N2 пройден ✅
+    next: hub
 
-  finish:
+  # ---- N3: медиа (картинка + аудио) ----
+  N3_intro:
+    mode: info
+    text: |
+      ТЕСТ: Узел N3 (медиа)
+      Сейчас придёт картинка. Посмотри и введи слово «медиа».
+    image: n3_page1.png
+    next: N3_question
+
+  N3_question:
+    mode: auto
+    text: Какое слово на картинке?
+    accept:
+      - "медиа"
+      - "Медиа"
+    hint: Под картинкой текст «ИЩИ». Но ответь «медиа».
+    next: N3_fragment
+
+  N3_fragment:
+    mode: info
+    text: |
+      N3 пройден ✅
+    next: hub
+
+  # ---- финал-заглушка ----
+  final_hint:
     mode: finish
     text: |
-      Йоу-йоу-йоу, с тестами покончено
+      ┌─ ТЕСТ ЗАВЕРШЁН ─┐
+      Все узлы пройдены! 🎉

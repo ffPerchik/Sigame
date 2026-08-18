@@ -1,20 +1,9 @@
-"""Telegram-бот квеста: трекинг прогресса игроков.
+"""Telegram-бот квеста ARGVS-1001: хаб-модель, 6 независимых узлов.
 
-Все тексты сообщений вынесены в texts.py — меняй формулировки там, логику не трогай.
-Игроки: /start <код> — старт, далее шлют ответы/фото. mode=auto — бот проверяет сам;
-approve — сабмит уходит ведущему на апрув. QR на локациях = deep link.
-
-ХАБ-МОДЕЛЬ (см. stages.yaml:hub):
-  • Каждый узел — цепочка Nx_intro → Nx_* → Nx_fragment → hub
-  • После fragment игрок возвращается в хаб и сам выбирает следующий
-  • Все 6 пройдены → автопереход в final_hint
-  • Прогресс по узлам — отдельная таблица db.nodes_progress
-
-Ведущий (HOST_ID): /stats /pending /addhint /sethint /setstage /broadcast /reset + кнопки.
-Подсказки: ЗАРАБАТЫВАЮТСЯ в «Своей игре» (ведущий начисляет /addhint), ТРАТЯТСЯ в квесте (/hint).
+Хаб с кнопками: игрок выбирает узел -> проходит целиком -> возвращается в хаб.
+Точка-пауза (start_gate) после /start <код> до апрува ведущего.
 """
 import asyncio
-import re
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher, F
@@ -29,9 +18,6 @@ import config as cfg
 import db
 import quest
 import texts as T
-
-# распознавание ввода в хабе: "1".."6" или "N1".."N6"
-_HUB_PICK_RE = re.compile(r"^\s*([Nn])?([1-6])\s*$")
 
 BASE = Path(__file__).resolve().parent
 
@@ -50,8 +36,16 @@ class HostFilter(BaseFilter):
         return message.from_user and message.from_user.id == cfg.HOST_ID
 
 
+# ---- helpers ----------------------------------------------------------------
+
+async def notify_host(text: str) -> None:
+    try:
+        await bot.send_message(cfg.HOST_ID, text)
+    except Exception:
+        pass
+
+
 def _resolve(arg: str):
-    """@username или числовой id -> user_id (или None)."""
     arg = (arg or "").strip().lstrip("@")
     if arg.isdigit():
         uid = int(arg)
@@ -63,17 +57,11 @@ def _name(p) -> str:
     return f"{p['name']} (@{p['username'] or '—'})"
 
 
-# ----------------- вспомогательные -----------------
-
-async def notify_host(text: str) -> None:
-    try:
-        await bot.send_message(cfg.HOST_ID, text)
-    except Exception:
-        pass
-
+# ======================== send_stage ========================================
 
 async def send_stage(uid: int, stage_id: str) -> None:
-    # Хаб — динамический (строится по статусу игрока в db.nodes_progress)
+    """Отправляет игроку содержимое стадии (текст + медиа).
+    Хаб обрабатывается отдельно — _send_hub()."""
     if stage_id == "hub":
         await _send_hub(uid)
         return
@@ -83,7 +71,6 @@ async def send_stage(uid: int, stage_id: str) -> None:
         return
     text = (st.get("text") or "").strip()
     media_dir = BASE / "quest" / "images"
-    # Ищем поле с медиа: photo > audio > video > document. Каждое — отдельный файл.
     for field, sender, kind_label in (
         ("image",    bot.send_photo,    "photo"),
         ("audio",    bot.send_audio,    "audio"),
@@ -102,62 +89,52 @@ async def send_stage(uid: int, stage_id: str) -> None:
     await bot.send_message(uid, text)
 
 
-# ----------------- HUB: меню выбора узла -----------------
+# ======================== HUB ===============================================
 
 async def _send_hub(uid: int) -> None:
-    """Динамически строит меню выбора узла. Если все 6 пройдены — авто-финал."""
+    """Динамически строит хаб с кнопками выбора узла."""
     status = db.nodes_status(uid)
     done_count = sum(1 for v in status.values() if v == "done")
 
     if done_count == 6:
-        # Все шесть узлов пройдены → автопереход в final_hint
         db.set_stage(uid, "final_hint")
         await bot.send_message(uid, T.HUB_DONE_NOTICE)
         await send_stage(uid, "final_hint")
         return
 
+    nodes = quest.nodes_meta()
     lines = [T.HUB_HEADER, ""]
-    for nid in ("N1", "N2", "N3", "N4", "N5", "N6"):
-        n = nid[1:]                              # "1".."6" — для UI
-        label = T.NODE_LABELS[nid]
-        hint  = T.NODE_SHORT[nid]
-        tmpl  = T.HUB_LINE_DONE if status[nid] == "done" else T.HUB_LINE_TODO
-        lines.append(tmpl.format(n=n, label=label, hint=hint))
-
+    for nid, meta in nodes.items():
+        n = nid[1:]
+        tmpl = T.HUB_LINE_DONE if status[nid] == "done" else T.HUB_LINE_TODO
+        lines.append(tmpl.format(n=n, label=meta.get("label", ""), hint=meta.get("hint", "")))
     lines.append("")
     lines.append(T.HUB_FOOTER.format(done=done_count))
-    lines.append(T.HUB_PROGRESS_HINT)
-    await bot.send_message(uid, "\n".join(lines))
+    text = "\n".join(lines)
+
+    # Кнопки: только непройденные узлы
+    buttons = []
+    for nid in nodes:
+        if status[nid] != "done":
+            buttons.append(InlineKeyboardButton(text=nid, callback_data=f"node:{nid}"))
+    kb_lines = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+    kb = InlineKeyboardMarkup(inline_keyboard=kb_lines)
+
+    await bot.send_message(uid, text, reply_markup=kb)
 
 
-async def _hub_handle_input(uid: int, message: Message) -> None:
-    """Парсит выбор узла, ставит Nx_intro, отправляет intro и прокручивает
-    цепочку info-стадий до первого интерактивного (auto/approve/finish).
-
-    Образец — cmd_start(): сначала send_stage(Nx_intro), потом advance(),
-    чтобы intro-фото ушло игроку. Без этого игрок застрял бы на intro
-    и получал WAIT_INFO на любой текст.
-    """
-    text = (message.text or "").strip()
-    m = _HUB_PICK_RE.match(text)
-    if not m:
-        await message.answer(T.HUB_PICK_BAD + "\n" + T.HUB_PICK_BAD_TIP)
-        await _send_hub(uid)
-        return
-    n = int(m.group(2))
-    node_id = f"N{n}"
-    db.set_stage(uid, f"{node_id}_intro")
-    db.log_event(uid, "hub_pick", node_id)
-    await message.answer(T.HUB_PICK_OK.format(node=node_id))
-    await send_stage(uid, f"{node_id}_intro")      # отдаём intro (с фото/аудио/видео)
-    await advance(uid)                              # прокручиваем остальную info-цепочку
-
+# ======================== advance ===========================================
 
 async def advance(uid: int) -> None:
+    """Авто-прогон по цепочке next: до первой не-info стадии.
+    Хаб — терминал. Фрагмент -> хаб отмечает узел пройденным."""
     player = db.get_player(uid)
     if not player:
         return
     cur = player["stage"]
+    if cur == "hub":
+        return
+
     st = quest.get_stage(cur)
     if not st:
         return
@@ -165,11 +142,10 @@ async def advance(uid: int) -> None:
     if not nxt:
         return
 
-    # Если уходим с Nx_fragment — узел считается пройденным
-    if cur.endswith("_fragment"):
-        node_id = cur[: -len("_fragment")]
-        if node_id in ("N1", "N2", "N3", "N4", "N5", "N6"):
-            db.mark_node_done(uid, node_id)
+    # Уходим с Nx_fragment -> отмечаем узел пройденным
+    node_id = quest.extract_node_id(cur)
+    if cur.endswith("_fragment") and node_id:
+        db.mark_node_done(uid, node_id)
 
     db.set_stage(uid, nxt)
     db.log_event(uid, "advance", f"{cur} -> {nxt}")
@@ -178,13 +154,13 @@ async def advance(uid: int) -> None:
         await notify_host(T.ADVANCE_HOST.format(name=name, cur=cur, nxt=nxt))
     await send_stage(uid, nxt)
 
-    # Хаб — терминал в цепочке auto-advance (его текст динамический, не info-цепочка)
     if nxt == "hub":
         return
 
     nst = quest.get_stage(nxt)
     if nst and nst.get("mode") == "info":
         await advance(uid)
+
     if quest.is_finish(nxt):
         db.mark_finished(uid)
         p2 = db.get_player(uid)
@@ -193,6 +169,8 @@ async def advance(uid: int) -> None:
         if cfg.NOTIFY_HOST:
             await notify_host(T.FINISH_HOST.format(name=name, bal=b))
 
+
+# ======================== answers & submissions =============================
 
 async def _try_answer(uid: int, message: Message, text: str) -> None:
     player = db.get_player(uid)
@@ -228,15 +206,19 @@ async def _submit_for_approval(uid: int, message: Message) -> None:
         InlineKeyboardButton(text="✅ Одобрить", callback_data=f"appr:{uid}:{sub_id}"),
         InlineKeyboardButton(text="❌ Отклонить", callback_data=f"rej:{uid}:{sub_id}"),
     ]])
-    caption = T.SUBMIT_RELAY.format(name=_name(player), stage=stage_id, payload=payload or "(нет)")
+    caption = T.SUBMIT_RELAY.format(name=_name(player), stage=stage_id,
+                                    payload=payload or "(нет)")
     try:
         if kind in ("photo", "video") and file_id:
             if kind == "photo":
-                await bot.send_photo(cfg.HOST_ID, file_id, caption=caption, reply_markup=kb)
+                await bot.send_photo(cfg.HOST_ID, file_id, caption=caption,
+                                     reply_markup=kb)
             else:
-                await bot.send_video(cfg.HOST_ID, file_id, caption=caption, reply_markup=kb)
+                await bot.send_video(cfg.HOST_ID, file_id, caption=caption,
+                                     reply_markup=kb)
         elif kind in ("document", "voice") and file_id:
-            await bot.send_document(cfg.HOST_ID, file_id, caption=caption, reply_markup=kb)
+            await bot.send_document(cfg.HOST_ID, file_id, caption=caption,
+                                    reply_markup=kb)
         else:
             await bot.send_message(cfg.HOST_ID, caption, reply_markup=kb)
     except Exception as e:
@@ -245,7 +227,7 @@ async def _submit_for_approval(uid: int, message: Message) -> None:
     await message.answer(T.SUBMIT_SENT)
 
 
-# ----------------- игрок: /start -----------------
+# ======================== /start ============================================
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message, command: CommandStart) -> None:
@@ -255,21 +237,45 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
 
     if payload and payload == quest.entry_code():
         if player is None:
-            first = quest.first_stage()
-            db.register(uid, message.from_user.username or "", message.from_user.full_name, first)
+            db.register(uid, message.from_user.username or "",
+                        message.from_user.full_name, "start_gate")
             db.log_event(uid, "register")
-            await message.answer(T.WELCOME)
-            await send_stage(uid, first)
-            if quest.get_stage(first) and quest.get_stage(first).get("mode") == "info":
-                await advance(uid)
-            await notify_host(T.NEW_PLAYER.format(
-                name=message.from_user.full_name, username=message.from_user.username or "—"))
+
+            # Приветствие из YAML welcome
+            welcome = quest.welcome_info()
+            welcome_text = welcome.get("text", T.WELCOME)
+            welcome_image = welcome.get("image")
+            if welcome_image:
+                path = (Path(welcome_image) if Path(welcome_image).is_absolute()
+                        else BASE / "quest" / "images" / welcome_image)
+                try:
+                    await bot.send_photo(uid, FSInputFile(path), caption=welcome_text)
+                except Exception:
+                    await bot.send_message(uid, welcome_text)
+            else:
+                await bot.send_message(uid, welcome_text)
+
+            # Кнопки ведущему
+            name = message.from_user.full_name
+            username = message.from_user.username or "—"
+            kb = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton("✅ Запустить", callback_data=f"gate_appr:{uid}"),
+                InlineKeyboardButton("❌ Отклонить", callback_data=f"gate_rej:{uid}"),
+            ]])
+            await notify_host(T.NEW_PLAYER_GATE.format(name=name, username=username))
+            await bot.send_message(
+                cfg.HOST_ID,
+                f"🆕 {name} (@{username}) ждёт старта.",
+                reply_markup=kb,
+            )
+            await send_stage(uid, "start_gate")
         else:
             await message.answer(T.ALREADY_IN_QUEST)
         return
 
     if not payload:
-        await message.answer(T.ALREADY_IN_QUEST if player is not None else T.NEED_CODE)
+        await message.answer(
+            T.ALREADY_IN_QUEST if player is not None else T.NEED_CODE)
         return
 
     if player is None:
@@ -278,20 +284,84 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
     await _try_answer(uid, message, payload)
 
 
-# ----------------- игрок: команды -----------------
+# ======================== gate approve / reject =============================
+
+@dp.callback_query(F.data.startswith("gate_appr:"))
+async def cb_gate_approve(cq: CallbackQuery) -> None:
+    if cq.from_user.id != cfg.HOST_ID:
+        return await cq.answer(T.ONLY_HOST, show_alert=True)
+    uid = int(cq.data.split(":", 1)[1])
+    db.set_stage(uid, "prologue")
+    db.log_event(uid, "gate_approved")
+    await cq.answer("✅ Игрок запущен!")
+    try:
+        await cq.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await notify_host(T.GATE_APPROVED.format(uid=uid))
+    await send_stage(uid, "prologue")
+    await advance(uid)  # prologue -> hub
+
+
+@dp.callback_query(F.data.startswith("gate_rej:"))
+async def cb_gate_reject(cq: CallbackQuery) -> None:
+    if cq.from_user.id != cfg.HOST_ID:
+        return await cq.answer(T.ONLY_HOST, show_alert=True)
+    uid = int(cq.data.split(":", 1)[1])
+    db.log_event(uid, "gate_rejected")
+    await cq.answer("❌ Отклонён")
+    try:
+        await cq.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await bot.send_message(uid, T.GATE_REJECTED)
+    await notify_host(T.GATE_REJECTED_HOST.format(uid=uid))
+
+
+# ======================== node pick (hub buttons) ===========================
+
+@dp.callback_query(F.data.startswith("node:"))
+async def cb_node_pick(cq: CallbackQuery) -> None:
+    uid = cq.from_user.id
+    node_id = cq.data.split(":", 1)[1]
+
+    if db.is_node_done(uid, node_id):
+        await cq.answer(T.NODE_ALREADY_DONE, show_alert=True)
+        return
+
+    intro_stage = f"{node_id}_intro"
+    if not quest.get_stage(intro_stage):
+        await cq.answer(T.NODE_NOT_FOUND, show_alert=True)
+        return
+
+    db.set_stage(uid, intro_stage)
+    db.log_event(uid, "node_pick", node_id)
+    await cq.answer(T.NODE_PICK_OK.format(node=node_id))
+
+    try:
+        await cq.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    await send_stage(uid, intro_stage)
+    await advance(uid)
+
+
+# ======================== player commands ===================================
 
 @dp.message(Command("progress"))
 async def cmd_progress(message: Message) -> None:
-    p = db.get_player(message.from_user.id)
+    uid = message.from_user.id
+    p = db.get_player(uid)
     if not p:
         return await message.answer(T.NOT_IN_QUEST)
     bal = p["banked"] or 0
     if p["finished_at"]:
-        await message.answer(T.PROGRESS_FINISHED.format(bal=bal))
-    else:
-        st = quest.get_stage(p["stage"])
-        question = (st.get("text") or "").strip() if st else ""
-        await message.answer(T.PROGRESS_STAGE.format(stage=p["stage"], bal=bal, question=question))
+        return await message.answer(T.PROGRESS_FINISHED.format(bal=bal))
+    if p["stage"] == "start_gate":
+        return await message.answer(T.PROGRESS_GATE)
+    await message.answer(T.PROGRESS_STAGE_HEADER.format(stage=p["stage"], bal=bal))
+    await send_stage(uid, p["stage"])
 
 
 @dp.message(Command("hint"))
@@ -300,6 +370,8 @@ async def cmd_hint(message: Message) -> None:
     p = db.get_player(uid)
     if not p:
         return await message.answer(T.HINT_NEED_START)
+    if p["stage"] in ("start_gate", "hub"):
+        return await message.answer(T.NO_HINT_HERE)
     st = quest.get_stage(p["stage"])
     hint = st.get("hint") if st else None
     if not hint:
@@ -308,14 +380,16 @@ async def cmd_hint(message: Message) -> None:
     if bal <= 0:
         return await message.answer(T.NO_HINTS_LEFT)
     db.add_banked(uid, -1)
-    await message.answer(T.HINT_USED.format(hint=hint, remaining=bal - 1))
+    bal -= 1
+    await message.answer(T.HINT_USED.format(hint=hint, remaining=bal))
     if cfg.NOTIFY_HOST:
-        await notify_host(T.HINT_HOST.format(name=_name(p), stage=p["stage"], remaining=bal - 1))
+        await notify_host(T.HINT_HOST.format(name=_name(p), stage=p["stage"], remaining=bal))
 
 
 @dp.message(Command("help"))
 async def cmd_help(message: Message) -> None:
-    await message.answer(T.ADMIN_HELP if message.from_user.id == cfg.HOST_ID else T.PLAYER_HELP)
+    await message.answer(
+        T.ADMIN_HELP if message.from_user.id == cfg.HOST_ID else T.PLAYER_HELP)
 
 
 @dp.message(Command("id"))
@@ -330,7 +404,21 @@ async def cmd_ping(message: Message) -> None:
     await message.answer(T.PONG)
 
 
-# ----------------- ведущий: апрув (кнопки) -----------------
+@dp.message(Command("hub"))
+async def cmd_hub(message: Message) -> None:
+    uid = message.from_user.id
+    p = db.get_player(uid)
+    if not p:
+        return await message.answer(T.NOT_IN_QUEST)
+    if p["stage"] == "hub":
+        await _send_hub(uid)
+    elif p["stage"] == "start_gate":
+        await message.answer(T.IN_GATE)
+    else:
+        await message.answer(T.NO_HUB_MID_NODE)
+
+
+# ======================== approve / reject (submissions) ====================
 
 @dp.callback_query(F.data.startswith("appr:"))
 async def cb_appr(cq: CallbackQuery) -> None:
@@ -364,7 +452,7 @@ async def cb_rej(cq: CallbackQuery) -> None:
     await bot.send_message(int(uid), T.REJECTED_TO_PLAYER)
 
 
-# ----------------- ведущий: команды -----------------
+# ======================== host commands =====================================
 
 @dp.message(HostFilter(), Command("stats"))
 async def cmd_stats(message: Message) -> None:
@@ -452,7 +540,6 @@ async def cmd_setstage(message: Message, command: Command) -> None:
         return await message.answer(T.STAGE_NOT_FOUND.format(stage=stage))
     db.set_stage(uid, stage)
     await send_stage(uid, stage)
-    # Если поставили info-стадию — прокатываем цепочку вперёд до интерактивной.
     await advance(uid)
     await message.answer(T.SETSTAGE_RESULT.format(uid=uid, stage=stage))
 
@@ -478,9 +565,8 @@ async def cmd_reset(message: Message, command: Command) -> None:
     if not args:
         return await message.answer(T.RESET_USAGE)
     uid = int(args[0])
-    first = quest.first_stage()
-    db.set_stage(uid, first)
-    await message.answer(T.RESET_DONE.format(uid=uid, stage=first))
+    db.set_stage(uid, "start_gate")
+    await message.answer(T.RESET_DONE.format(uid=uid, stage="start_gate"))
 
 
 @dp.message(HostFilter(), Command("approve"))
@@ -514,7 +600,7 @@ async def cmd_reject_cmd(message: Message, command: Command) -> None:
     await message.answer(T.NO_PENDING_2)
 
 
-# ----------------- универсальный приёмник (последний!) -----------------
+# ======================== universal message handler =========================
 
 @dp.message(F.content_type.in_({"text", "photo", "document", "voice", "video"}))
 async def on_message(message: Message) -> None:
@@ -522,19 +608,29 @@ async def on_message(message: Message) -> None:
     if message.text and message.text.startswith("/"):
         await message.answer(T.UNKNOWN_COMMAND)
         return
+
     player = db.get_player(uid)
     if player is None:
         await message.answer(T.START_FIRST)
         return
 
-    # SPECIAL: если игрок в хабе — обрабатываем выбор узла
+    if player["stage"] == "start_gate":
+        await message.answer(T.IN_GATE)
+        return
+
     if player["stage"] == "hub":
-        await _hub_handle_input(uid, message)
+        await message.answer(T.IN_HUB_USE_BUTTONS)
         return
 
     st = quest.get_stage(player["stage"])
-    if not st or st.get("mode") == "finish":
+    if not st:
+        await message.answer(T.STAGE_MISSING.format(stage=player["stage"]))
+        return
+    if st.get("mode") == "finish":
         await message.answer(T.ALREADY_FINISHED)
+        return
+    if st.get("mode") == "gate":
+        await message.answer(T.IN_GATE)
         return
     if st.get("mode") == "auto":
         await _try_answer(uid, message, message.text or message.caption or "")
@@ -544,7 +640,7 @@ async def on_message(message: Message) -> None:
         await message.answer(T.WAIT_INFO)
 
 
-# ----------------- main -----------------
+# ======================== main ==============================================
 
 async def main() -> None:
     db.init_db()

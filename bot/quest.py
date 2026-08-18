@@ -1,6 +1,6 @@
-"""Загрузка и проверка квеста (quest/stages.yaml)."""
+"""Загрузка и проверка квеста (quest/stages.yaml).Поддержка хаб-модели: welcome, start_gate, nodes, stages. """
 import re
-from pathlib import Path
+from collections import OrderedDict
 from typing import Optional
 
 import yaml
@@ -25,14 +25,38 @@ def entry_code() -> str:
 
 
 def first_stage() -> str:
+    """Первая стадия после /start <код> + приветствия — start_gate."""
+    return "start_gate"
+
+
+# ---- Приветствие ----
+def welcome_info() -> dict:
+    """Возвращает {text, image?} из секции welcome."""
     q = load()
-    if q.get("start"):
-        return q["start"]
-    return next(iter(q["stages"]))
+    return q.get("welcome", {})
+
+
+# ---- Метаданные узлов для хаба ----
+def nodes_meta() -> OrderedDict:
+    """Возвращает OrderedDict {node_id: {label, hint}} из секции nodes,
+    сохраняя порядок N1…N6. """
+    q = load()
+    raw = q.get("nodes", {})
+    # сортируем по ключу (N1…N6)
+    ordered = OrderedDict()
+    for nid in ("N1", "N2", "N3", "N4", "N5", "N6"):
+        if nid in raw:
+            ordered[nid] = raw[nid]
+    return ordered
 
 
 def get_stage(stage_id: str) -> Optional[dict]:
     return load().get("stages", {}).get(stage_id)
+
+
+def is_gate(stage_id: str) -> bool:
+    st = get_stage(stage_id)
+    return bool(st and st.get("mode") == "gate")
 
 
 def is_finish(stage_id: str) -> bool:
@@ -40,10 +64,29 @@ def is_finish(stage_id: str) -> bool:
     return bool(st and st.get("mode") == "finish")
 
 
+def is_info(stage_id: str) -> bool:
+    st = get_stage(stage_id)
+    return bool(st and st.get("mode") == "info")
+
+
+def is_hub(stage_id: str) -> bool:
+    """Хаб — это виртуальная стадия, обрабатывается кодом."""
+    return stage_id == "hub"
+
+
+def extract_node_id(stage_id: str) -> Optional[str]:
+    """По stage_id (например «N1_place») возвращает node_id (например «N1»)."""
+    for prefix in ("N1", "N2", "N3", "N4", "N5", "N6"):
+        if stage_id.startswith(prefix + "_"):
+            return prefix
+    return None
+
+
+# ---- Валидация ответов ----
 def _norm(s: str) -> str:
     s = (s or "").lower().strip()
     s = s.replace("ё", "е")
-    s = re.sub(r"[^a-zа-я0-9]+", " ", s)  # пунктуацию/лишние пробелы — в один пробел
+    s = re.sub(r"[^a-zа-я0-9]+", " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
 

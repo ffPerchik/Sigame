@@ -24,7 +24,7 @@ def init_db() -> None:
                 stage       TEXT,
                 started_at  REAL,
                 finished_at REAL,
-                score       INTEGER DEFAULT 0
+                banked      INTEGER DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS submissions (
                 id       INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,10 +35,6 @@ def init_db() -> None:
                 file_id  TEXT,
                 status   TEXT DEFAULT 'pending',
                 ts       REAL
-            );
-            CREATE TABLE IF NOT EXISTS hints (
-                user_id INTEGER, stage TEXT, used INTEGER DEFAULT 0,
-                PRIMARY KEY (user_id, stage)
             );
             CREATE TABLE IF NOT EXISTS log (
                 id      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,7 +58,7 @@ def init_db() -> None:
 # ---- прогресс по узлам квеста (hub-модель) ---------------------------------
 
 def mark_node_done(user_id: int, node_id: str) -> None:
-    """Отметить узел как пройденный (idempotent: можно повторно)."""
+    """Отметить узел как пройденный (idempotent)."""
     with _conn() as c:
         c.execute(
             "INSERT INTO nodes_progress(user_id, node_id, finished, finished_at) "
@@ -97,6 +93,8 @@ def count_nodes_done(user_id: int) -> int:
     return sum(1 for v in nodes_status(user_id).values() if v == "done")
 
 
+# ---- игроки ----------------------------------------------------------------
+
 def register(user_id: int, username: str, name: str, stage: str) -> None:
     with _conn() as c:
         c.execute(
@@ -120,11 +118,6 @@ def set_stage(user_id: int, stage: str) -> None:
         c.execute("UPDATE players SET stage=? WHERE user_id=?", (stage, user_id))
 
 
-def add_score(user_id: int, delta: int) -> None:
-    with _conn() as c:
-        c.execute("UPDATE players SET score=score+? WHERE user_id=?", (delta, user_id))
-
-
 def mark_finished(user_id: int) -> None:
     with _conn() as c:
         c.execute(
@@ -133,8 +126,9 @@ def mark_finished(user_id: int) -> None:
         )
 
 
+# ---- подсказки (banked) ----------------------------------------------------
+
 def add_banked(user_id: int, n: int = 1) -> int:
-    """Начислить «подсказку» для грядущей Игры (награда за пройденный этап)."""
     with _conn() as c:
         c.execute(
             "UPDATE players SET banked=COALESCE(banked,0)+? WHERE user_id=?",
@@ -158,6 +152,8 @@ def find_by_username(username: str) -> Optional[int]:
         ).fetchone()
         return row["user_id"] if row else None
 
+
+# ---- сабмиты на апрув ------------------------------------------------------
 
 def add_submission(user_id: int, stage: str, kind: str, payload: str, file_id: Optional[str]) -> int:
     with _conn() as c:
@@ -195,6 +191,8 @@ def all_players() -> list[sqlite3.Row]:
         ).fetchall()
 
 
+# ---- события ---------------------------------------------------------------
+
 def log_event(user_id: int, event: str, detail: str = "") -> None:
     with _conn() as c:
         c.execute(
@@ -203,18 +201,3 @@ def log_event(user_id: int, event: str, detail: str = "") -> None:
         )
 
 
-def hint_used(user_id: int, stage: str) -> int:
-    with _conn() as c:
-        row = c.execute(
-            "SELECT used FROM hints WHERE user_id=? AND stage=?", (user_id, stage)
-        ).fetchone()
-        return row["used"] if row else 0
-
-
-def inc_hint(user_id: int, stage: str) -> None:
-    with _conn() as c:
-        c.execute(
-            "INSERT INTO hints(user_id, stage, used) VALUES (?,?,1) "
-            "ON CONFLICT(user_id, stage) DO UPDATE SET used=used+1",
-            (user_id, stage),
-        )
