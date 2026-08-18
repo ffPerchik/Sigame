@@ -374,9 +374,15 @@ async def cmd_stats(message: Message) -> None:
     lines = [T.STATS_HEADER]
     for r in rows:
         mark = "🏁" if r["finished_at"] else "🚶"
+        ns = db.nodes_status(r["user_id"])
+        nodes_str = " ".join(
+            f"{nid[1:]}✓" if st == "done" else f"{nid[1:]}✗"
+            for nid, st in ns.items()
+        )
         lines.append(T.STATS_LINE.format(
             mark=mark, name=r["name"], username=r["username"] or "—",
-            uid=r["user_id"], stage=r["stage"] or "—", bal=r["banked"] or 0))
+            uid=r["user_id"], stage=r["stage"] or "—",
+            nodes=nodes_str, bal=r["banked"] or 0))
     await message.answer("\n".join(lines))
 
 
@@ -446,6 +452,8 @@ async def cmd_setstage(message: Message, command: Command) -> None:
         return await message.answer(T.STAGE_NOT_FOUND.format(stage=stage))
     db.set_stage(uid, stage)
     await send_stage(uid, stage)
+    # Если поставили info-стадию — прокатываем цепочку вперёд до интерактивной.
+    await advance(uid)
     await message.answer(T.SETSTAGE_RESULT.format(uid=uid, stage=stage))
 
 

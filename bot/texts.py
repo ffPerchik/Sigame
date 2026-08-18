@@ -73,8 +73,8 @@ STAGE_MISSING = "(стадия «{stage}» не найдена — скажи в
 
 # ============ ВЕДУЩИЙ: СПИСКИ ============
 STATS_EMPTY = "Игроков пока нет."
-STATS_HEADER = "📊 Прогресс (подсказки заработаны в «Своей игре», тратятся в квесте):"
-STATS_LINE = "{mark} {name} (@{username}) [id:{uid}]: «{stage}» | подсказок: {bal}"
+STATS_HEADER = "📊 Прогресс (6 узлов в квесте; подсказки заработаны в «Своей игре», тратятся в квесте):"
+STATS_LINE = "{mark} {name} (@{username}) [id:{uid}]: «{stage}» | {nodes} | подсказок: {bal}"
 PENDING_EMPTY = "Очередь пуста."
 PENDING_HEADER = "⏳ На проверке:"
 PENDING_LINE = "#{sid} {name} (@{username}): «{stage}» — {payload}"
