@@ -44,12 +44,57 @@ def init_db() -> None:
                 id      INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER, event TEXT, detail TEXT, ts REAL
             );
+            CREATE TABLE IF NOT EXISTS nodes_progress (
+                user_id     INTEGER NOT NULL,
+                node_id     TEXT    NOT NULL,
+                finished    INTEGER NOT NULL DEFAULT 0,
+                finished_at TEXT,
+                PRIMARY KEY (user_id, node_id)
+            );
             """
         )
         # миграции (для уже существующей БД)
         cols = [r["name"] for r in c.execute("PRAGMA table_info(players)")]
         if "banked" not in cols:
             c.execute("ALTER TABLE players ADD COLUMN banked INTEGER DEFAULT 0")
+
+
+# ---- прогресс по узлам квеста (hub-модель) ---------------------------------
+
+def mark_node_done(user_id: int, node_id: str) -> None:
+    """Отметить узел как пройденный (idempotent: можно повторно)."""
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO nodes_progress(user_id, node_id, finished, finished_at) "
+            "VALUES (?, ?, 1, ?) "
+            "ON CONFLICT(user_id, node_id) DO UPDATE SET finished=1, "
+            "finished_at=COALESCE(nodes_progress.finished_at, excluded.finished_at)",
+            (user_id, node_id, time.strftime("%Y-%m-%dT%H:%M:%S")),
+        )
+
+
+def is_node_done(user_id: int, node_id: str) -> bool:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT finished FROM nodes_progress WHERE user_id=? AND node_id=?",
+            (user_id, node_id),
+        ).fetchone()
+        return bool(row and row[0])
+
+
+def nodes_status(user_id: int, node_ids=("N1", "N2", "N3", "N4", "N5", "N6")) -> dict:
+    """Возвращает {node_id: 'done' | 'not_started'} для всех 6 узлов."""
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT node_id, finished FROM nodes_progress WHERE user_id=?",
+            (user_id,),
+        ).fetchall()
+    done = {r["node_id"] for r in rows if r["finished"]}
+    return {nid: ("done" if nid in done else "not_started") for nid in node_ids}
+
+
+def count_nodes_done(user_id: int) -> int:
+    return sum(1 for v in nodes_status(user_id).values() if v == "done")
 
 
 def register(user_id: int, username: str, name: str, stage: str) -> None:

@@ -3,10 +3,18 @@
 Все тексты сообщений вынесены в texts.py — меняй формулировки там, логику не трогай.
 Игроки: /start <код> — старт, далее шлют ответы/фото. mode=auto — бот проверяет сам;
 approve — сабмит уходит ведущему на апрув. QR на локациях = deep link.
+
+ХАБ-МОДЕЛЬ (см. stages.yaml:hub):
+  • Каждый узел — цепочка Nx_intro → Nx_* → Nx_fragment → hub
+  • После fragment игрок возвращается в хаб и сам выбирает следующий
+  • Все 6 пройдены → автопереход в final_hint
+  • Прогресс по узлам — отдельная таблица db.nodes_progress
+
 Ведущий (HOST_ID): /stats /pending /addhint /sethint /setstage /broadcast /reset + кнопки.
 Подсказки: ЗАРАБАТЫВАЮТСЯ в «Своей игре» (ведущий начисляет /addhint), ТРАТЯТСЯ в квесте (/hint).
 """
 import asyncio
+import re
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher, F
@@ -21,6 +29,9 @@ import config as cfg
 import db
 import quest
 import texts as T
+
+# распознавание ввода в хабе: "1".."6" или "N1".."N6"
+_HUB_PICK_RE = re.compile(r"^\s*([Nn])?([1-6])\s*$")
 
 BASE = Path(__file__).resolve().parent
 
@@ -62,6 +73,10 @@ async def notify_host(text: str) -> None:
 
 
 async def send_stage(uid: int, stage_id: str) -> None:
+    # Хаб — динамический (строится по статусу игрока в db.nodes_progress)
+    if stage_id == "hub":
+        await _send_hub(uid)
+        return
     st = quest.get_stage(stage_id)
     if not st:
         await bot.send_message(uid, T.STAGE_MISSING.format(stage=stage_id))
@@ -87,6 +102,50 @@ async def send_stage(uid: int, stage_id: str) -> None:
     await bot.send_message(uid, text)
 
 
+# ----------------- HUB: меню выбора узла -----------------
+
+async def _send_hub(uid: int) -> None:
+    """Динамически строит меню выбора узла. Если все 6 пройдены — авто-финал."""
+    status = db.nodes_status(uid)
+    done_count = sum(1 for v in status.values() if v == "done")
+
+    if done_count == 6:
+        # Все шесть узлов пройдены → автопереход в final_hint
+        db.set_stage(uid, "final_hint")
+        await bot.send_message(uid, T.HUB_DONE_NOTICE)
+        await send_stage(uid, "final_hint")
+        return
+
+    lines = [T.HUB_HEADER, ""]
+    for nid in ("N1", "N2", "N3", "N4", "N5", "N6"):
+        n = nid[1:]                              # "1".."6" — для UI
+        label = T.NODE_LABELS[nid]
+        hint  = T.NODE_SHORT[nid]
+        tmpl  = T.HUB_LINE_DONE if status[nid] == "done" else T.HUB_LINE_TODO
+        lines.append(tmpl.format(n=n, label=label, hint=hint))
+
+    lines.append("")
+    lines.append(T.HUB_FOOTER.format(done=done_count))
+    lines.append(T.HUB_PROGRESS_HINT)
+    await bot.send_message(uid, "\n".join(lines))
+
+
+async def _hub_handle_input(uid: int, message: Message) -> None:
+    """Парсит выбор узла из текста, ставит стадию Nx_intro и отправляет её."""
+    text = (message.text or "").strip()
+    m = _HUB_PICK_RE.match(text)
+    if not m:
+        await message.answer(T.HUB_PICK_BAD + "\n" + T.HUB_PICK_BAD_TIP)
+        await _send_hub(uid)
+        return
+    n = int(m.group(2))
+    node_id = f"N{n}"
+    db.set_stage(uid, f"{node_id}_intro")
+    db.log_event(uid, "hub_pick", node_id)
+    await message.answer(T.HUB_PICK_OK.format(node=node_id))
+    await send_stage(uid, f"{node_id}_intro")
+
+
 async def advance(uid: int) -> None:
     player = db.get_player(uid)
     if not player:
@@ -98,12 +157,24 @@ async def advance(uid: int) -> None:
     nxt = st.get("next")
     if not nxt:
         return
+
+    # Если уходим с Nx_fragment — узел считается пройденным
+    if cur.endswith("_fragment"):
+        node_id = cur[: -len("_fragment")]
+        if node_id in ("N1", "N2", "N3", "N4", "N5", "N6"):
+            db.mark_node_done(uid, node_id)
+
     db.set_stage(uid, nxt)
     db.log_event(uid, "advance", f"{cur} -> {nxt}")
     name = player["name"] or player["username"] or str(uid)
     if cfg.NOTIFY_HOST:
         await notify_host(T.ADVANCE_HOST.format(name=name, cur=cur, nxt=nxt))
     await send_stage(uid, nxt)
+
+    # Хаб — терминал в цепочке auto-advance (его текст динамический, не info-цепочка)
+    if nxt == "hub":
+        return
+
     nst = quest.get_stage(nxt)
     if nst and nst.get("mode") == "info":
         await advance(uid)
@@ -440,6 +511,12 @@ async def on_message(message: Message) -> None:
     if player is None:
         await message.answer(T.START_FIRST)
         return
+
+    # SPECIAL: если игрок в хабе — обрабатываем выбор узла
+    if player["stage"] == "hub":
+        await _hub_handle_input(uid, message)
+        return
+
     st = quest.get_stage(player["stage"])
     if not st or st.get("mode") == "finish":
         await message.answer(T.ALREADY_FINISHED)
