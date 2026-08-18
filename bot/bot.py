@@ -131,7 +131,13 @@ async def _send_hub(uid: int) -> None:
 
 
 async def _hub_handle_input(uid: int, message: Message) -> None:
-    """Парсит выбор узла из текста, ставит стадию Nx_intro и отправляет её."""
+    """Парсит выбор узла, ставит Nx_intro, отправляет intro и прокручивает
+    цепочку info-стадий до первого интерактивного (auto/approve/finish).
+
+    Образец — cmd_start(): сначала send_stage(Nx_intro), потом advance(),
+    чтобы intro-фото ушло игроку. Без этого игрок застрял бы на intro
+    и получал WAIT_INFO на любой текст.
+    """
     text = (message.text or "").strip()
     m = _HUB_PICK_RE.match(text)
     if not m:
@@ -143,7 +149,8 @@ async def _hub_handle_input(uid: int, message: Message) -> None:
     db.set_stage(uid, f"{node_id}_intro")
     db.log_event(uid, "hub_pick", node_id)
     await message.answer(T.HUB_PICK_OK.format(node=node_id))
-    await send_stage(uid, f"{node_id}_intro")
+    await send_stage(uid, f"{node_id}_intro")      # отдаём intro (с фото/аудио/видео)
+    await advance(uid)                              # прокручиваем остальную info-цепочку
 
 
 async def advance(uid: int) -> None:
