@@ -8,4 +8,5 @@ image-search/
 bot/.env
 bot/quest.db
 bot/qr/
+bot/quest/images/_n4_frames/
 bot/__pycache__/
