@@ -44,6 +44,41 @@ def font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     )
 
 
+def hack_glitch(img: Image.Image, seed: int = 1,
+                keep_rect: tuple[int, int, int, int] | None = None) -> Image.Image:
+    """Лёгкий «взлом»: сканлайны, сдвиг канала, битые пиксели по краям.
+    keep_rect = (x0,y0,x1,y1) не трогаем (текст на мониторе и т.п.)."""
+    arr = np.array(img.convert("RGB"), dtype=np.int16)
+    h, w = arr.shape[:2]
+    rng = np.random.default_rng(seed)
+
+    def _ok(x, y):
+        if keep_rect is None:
+            return True
+        x0, y0, x1, y1 = keep_rect
+        return not (x0 <= x <= x1 and y0 <= y <= y1)
+
+    arr[::7, :, :] = np.clip(arr[::7] + rng.integers(-10, 16), 0, 255)
+    sh = 2
+    arr[:, sh:, 0] = arr[:, :-sh, 0]
+    arr[:, :-sh, 2] = arr[:, sh:, 2]
+    for _ in range(max(18, w * h // 18000)):
+        x = int(rng.integers(0, max(w - 8, 1)))
+        y = int(rng.integers(0, max(h - 6, 1)))
+        if not _ok(x, y):
+            continue
+        bw, bh = int(rng.integers(2, 9)), int(rng.integers(1, 5))
+        val = int(rng.choice([0, 255, 30, 210, 0, 40]))
+        ch = int(rng.integers(0, 3))
+        arr[y:y + bh, x:x + bw, ch] = val
+    # блик в углу
+    cx, cy = int(w * 0.08), int(h * 0.1)
+    yy, xx = np.ogrid[:h, :w]
+    blob = np.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * (min(w, h) * 0.07) ** 2))
+    arr[:, :, 1] = np.clip(arr[:, :, 1] + blob * 40, 0, 255)
+    return Image.fromarray(arr.clip(0, 255).astype(np.uint8))
+
+
 def ffmpeg() -> str | None:
     try:
         import imageio_ffmpeg
@@ -137,7 +172,7 @@ def make_n1():
     LSB/каналы не используем: вход из SIGame уже LSB, онлайн-декодеры наш LSB не видели.
     Хвост после FFD9 живёт, только если бот шлёт JPEG как document.
     """
-    img = _n1_still()
+    img = hack_glitch(_n1_still(), seed=1001, keep_rect=(780, 250, 1180, 560))
     msg = a1z26_encode("СЛОИ")
     jpg_path = OUT / "n1_card.jpg"
     exif_dict = {
@@ -297,7 +332,7 @@ def make_n2_sheet():
     d.text((40, 330), words[6] + "   " + words[7], fill=(20, 20, 40), font=font(40))
     d.text((40, 430), "Бери слова на позициях ряда, который\nуже написан в шапке. Из первых букв — слово.",
            fill=(90, 70, 50), font=font(22))
-    img.save(out)
+    hack_glitch(img, seed=22).save(out)
     # 1,1,2,3,5,8 with 1-based unique: 1,2,3,5,8 → Э Х О О Ш = ЭХООШ
     # Better unique fib: 1,2,3 → ЭХО  and header says 1 1 2 3 as hint of fib
     print("  N2  verse fib 1,2,3 → ЭХО  (первые три ненулевых)")
@@ -380,21 +415,21 @@ def make_n3():
     for i, ch in enumerate("АБВ"):
         draw_pigpen(d, (50 + i * 90, 460), ch, scale=16)
         d.text((50 + i * 90, 530), ch, fill=(70, 60, 50), font=font(18))
-    p1.save(OUT / "n3_pigpen.png")
+    hack_glitch(p1, seed=31).save(OUT / "n3_pigpen.png")
 
     p2 = Image.new("RGB", (1100, 420), (232, 216, 190))
     d = ImageDraw.Draw(p2)
     d.text((36, 20), "ТЕТРАДЬ · лист II   зигзаг / 3 рельса", fill=(80, 50, 30), font=font(26))
     d.text((36, 140), rail_c, fill=(20, 20, 50), font=font(72))
     d.text((36, 280), "Читай как железнодорожную изгородь. Три нити.", fill=(70, 60, 50), font=font(22))
-    p2.save(OUT / "n3_rail.png")
+    hack_glitch(p2, seed=32).save(OUT / "n3_rail.png")
 
     p3 = Image.new("RGB", (1100, 480), (232, 216, 190))
     d = ImageDraw.Draw(p3)
     d.text((36, 20), "ТЕТРАДЬ · лист III   ключ — то, что открыл лист I", fill=(80, 50, 30), font=font(24))
     d.text((36, 140), vig_c, fill=(20, 20, 50), font=font(64))
     d.text((36, 280), "Виженер. Алфавит 32 буквы, без Ё. Ключ уже у тебя.", fill=(70, 60, 50), font=font(22))
-    p3.save(OUT / "n3_vig.png")
+    hack_glitch(p3, seed=33).save(OUT / "n3_vig.png")
 
     p4 = Image.new("RGB", (1100, 640), (232, 216, 190))
     d = ImageDraw.Draw(p4)
@@ -404,7 +439,7 @@ def make_n3():
     coord_s = "  ".join(f"{a}.{b}" for a, b in picks)
     d.text((48, 420), coord_s, fill=(140, 30, 30), font=font(36))
     d.text((48, 500), "строка.слово  →  первая буква каждого слова", fill=(70, 60, 50), font=font(22))
-    p4.save(OUT / "n3_book.png")
+    hack_glitch(p4, seed=34).save(OUT / "n3_book.png")
 
     print(f"  N3  pigpen {word1}")
     print(f"  N3  rail {rail_plain} → {rail_c}")
@@ -438,7 +473,7 @@ def make_n4():
             d = ImageDraw.Draw(img)
             d.text((40, 200), hex_word, fill=(240, 240, 240), font=font(48))
             d.text((40, 300), "UTF-8", fill=(120, 120, 120), font=font(22))
-        img.save(frames_dir / f"f{i:03d}.png")
+        hack_glitch(img, seed=40 + i).save(frames_dir / f"f{i:03d}.png")
 
     mp4 = OUT / "n4_walk.mp4"
     if exe:
@@ -482,7 +517,7 @@ def make_n4():
             py = int(rng.integers(y0 + 8, y1 - 12))
             d.rectangle((px, py, px + 8, py + 8), fill=(15, 15, 15))
         d.text((x0 + 40, y0 + 50), ch, fill=(10, 10, 10), font=font(72))
-    frag.save(OUT / "n4_shards.png")
+    hack_glitch(frag, seed=44).save(OUT / "n4_shards.png")
     print("  N4  shards → КАДР")
 
 
@@ -524,7 +559,7 @@ def make_n5():
             d.text((x + 8, y + 4), str(square[r][c]), fill=(140, 140, 160), font=font(18))
             d.text((x + 36, y + 28), grid_letters[r][c], fill=(10, 10, 30), font=font(40))
     d.text((32, 620), "XXXX в квадрате — шум. Значимы первые пять по порядку.", fill=(90, 90, 110), font=font(20))
-    tab.save(OUT / "n5_table.png")
+    hack_glitch(tab, seed=51).save(OUT / "n5_table.png")
 
     html = """<!DOCTYPE html>
 <html lang="ru"><head><meta charset="utf-8"><title>shadow ledger</title></head>
@@ -548,7 +583,7 @@ def make_n5():
     d.text((32, 90), "ряд, который уже встречался в другом узле,\nно здесь — только числа:", fill=(160, 160, 170), font=font(22))
     d.text((32, 190), "1  1  2  3  5  8  13  21", fill=(230, 210, 80), font=font(36))
     d.text((32, 270), "четыре средних двузначных? нет. четыре после единиц.", fill=(120, 120, 130), font=font(20))
-    lock_img.save(OUT / "n5_lock.png")
+    hack_glitch(lock_img, seed=52).save(OUT / "n5_lock.png")
     # 2 3 5 8 → 2358  "четыре после единиц" = 2,3,5,8
     print("  N5  lock code 2358")
 

@@ -291,9 +291,9 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
             await notify_host(T.NEW_PLAYER_GATE.format(name=name, username=username))
             if cfg.HOST_CONSOLE:
                 _host_print(f"HOST_CONSOLE=1 → автозапуск игрока {uid} (@{username})")
-                db.set_stage(uid, "prologue")
+                db.set_stage(uid, "z_hello")
                 db.log_event(uid, "gate_approved", "console")
-                await send_stage(uid, "prologue")
+                await send_stage(uid, "z_hello")
                 await advance(uid)
             else:
                 await send_host(
@@ -323,7 +323,7 @@ async def cb_gate_approve(cq: CallbackQuery) -> None:
     if cq.from_user.id != cfg.HOST_ID:
         return await cq.answer(T.ONLY_HOST, show_alert=True)
     uid = int(cq.data.split(":", 1)[1])
-    db.set_stage(uid, "prologue")
+    db.set_stage(uid, "z_hello")
     db.log_event(uid, "gate_approved")
     await cq.answer("✅ Игрок запущен!")
     try:
@@ -331,8 +331,8 @@ async def cb_gate_approve(cq: CallbackQuery) -> None:
     except Exception:
         pass
     await notify_host(T.GATE_APPROVED.format(uid=uid))
-    await send_stage(uid, "prologue")
-    await advance(uid)  # prologue -> hub
+    await send_stage(uid, "z_hello")
+    await advance(uid)
 
 
 @dp.callback_query(F.data.startswith("gate_rej:"))
