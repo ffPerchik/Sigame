@@ -21,6 +21,14 @@ OUT = ROOT / "bot" / "quest" / "images"
 OUT.mkdir(parents=True, exist_ok=True)
 
 FONTS = [
+    str(ROOT / "tools" / "fonts" / "DejaVuSans-Bold.ttf"),
+    str(ROOT / "tools" / "fonts" / "DejaVuSans.ttf"),
+    str(ROOT / "tools" / "fonts" / "DejaVuSansMono-Bold.ttf"),
+    r"C:\Windows\Fonts\arialbd.ttf",
+    r"C:\Windows\Fonts\arial.ttf",
+    r"C:\Windows\Fonts\segoeuib.ttf",
+    r"C:\Windows\Fonts\segoeui.ttf",
+    r"C:\Windows\Fonts\tahoma.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -31,7 +39,9 @@ def font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     for p in FONTS:
         if Path(p).exists():
             return ImageFont.truetype(p, size)
-    return ImageFont.load_default()
+    raise FileNotFoundError(
+        "Нет шрифта с кириллицей. В репо должен быть tools/fonts/DejaVuSans-Bold.ttf"
+    )
 
 
 def ffmpeg() -> str | None:
