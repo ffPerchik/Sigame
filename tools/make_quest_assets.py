@@ -132,49 +132,34 @@ def _n1_still() -> Image.Image:
 
 
 def make_n1():
-    """Слои: переворот → EXIF → зелёный канал → LSB (A1Z26 = СЛОИ)."""
-    base = _n1_still()
-    card = Image.new("RGB", (1200, 920), (28, 24, 22))
-    card.paste(base, (0, 0))
-    d = ImageDraw.Draw(card)
-    motto = "ЬТРУНВ ИРТОМС"  # СМОТРИ ВНУТРЬ задом наперёд
-    d.text((60, 820), motto, fill=(210, 200, 180), font=font(42))
-    d.text((60, 875), "ARGVS · слой 0", fill=(120, 110, 100), font=font(18))
+    """Скрытая надпись на кадре (делает ведущий на n1_carrier) → EXIF FFD9 → хвост JPEG → A1Z26 СЛОИ.
 
-    # зелёный канал: почти невидимая надпись LSB-B
-    arr = np.array(card)
-    overlay = Image.new("L", card.size, 0)
-    od = ImageDraw.Draw(overlay)
-    od.text((80, 80), "LSB-B", fill=18, font=font(96))
-    ov = np.array(overlay)
-    mask = ov > 0
-    arr[:, :, 1] = np.where(mask, np.clip(arr[:, :, 1].astype(int) + ov, 0, 255), arr[:, :, 1])
-    card = Image.fromarray(arr.astype(np.uint8))
-
-    msg = a1z26_encode("СЛОИ")  # 19-13-16-09
-    png = lsb_embed(card, msg, channel=2)
-    png_path = OUT / "n1_layers.png"
-    png.save(png_path, "PNG")
-
-    # JPEG с EXIF (для просмотра «свойств»); LSB там не живёт
-    jpg = card.copy()
-    comment = "не карта. канал: green".encode("utf-8")
+    LSB/каналы не используем: вход из SIGame уже LSB, онлайн-декодеры наш LSB не видели.
+    Хвост после FFD9 живёт, только если бот шлёт JPEG как document.
+    """
+    img = _n1_still()
+    msg = a1z26_encode("СЛОИ")
+    jpg_path = OUT / "n1_card.jpg"
     exif_dict = {
         "0th": {
-            piexif.ImageIFD.Artist: "G-CHANNEL".encode("ascii"),
-            piexif.ImageIFD.ImageDescription: "ARGVS-1001 / look inside".encode("ascii"),
+            piexif.ImageIFD.Artist: "FFD9".encode("ascii"),
+            piexif.ImageIFD.ImageDescription: "not pixels".encode("ascii"),
         },
         "Exif": {
-            piexif.ExifIFD.UserComment: b"UNICODE\x00\x00" + "не карта — зелёный".encode("utf-16le"),
+            piexif.ExifIFD.UserComment: b"UNICODE\x00\x00"
+            + "не канал. хвост файла после маркера".encode("utf-16le"),
         },
     }
-    jpg_path = OUT / "n1_card.jpg"
-    jpg.save(jpg_path, "JPEG", quality=90, exif=piexif.dump(exif_dict))
-
-    print(f"  N1  reverse «{motto}» → СМОТРИ ВНУТРЬ")
-    print(f"  N1  EXIF Artist=G-CHANNEL / comment про зелёный")
-    print(f"  N1  green «LSB-B», LSB-blue «{msg}» → СЛОИ  (check: {lsb_extract(png)})")
-    return png_path, jpg_path
+    img.save(jpg_path, "JPEG", quality=92, exif=piexif.dump(exif_dict))
+    tail = b"\n" + msg.encode("ascii") + b"\n"
+    with jpg_path.open("ab") as f:
+        f.write(tail)
+    raw = jpg_path.read_bytes()
+    assert raw[-len(tail):] == tail
+    print("  N1  надпись на кадре рисует ведущий на content/n1_carrier.jpg → СМОТРИ ВНУТРЬ")
+    print("  N1  EXIF Artist=FFD9 / comment про хвост файла")
+    print(f"  N1  после FFD9 дописано «{msg}» → СЛОИ")
+    return jpg_path
 
 
 # ===================================================================== N2
