@@ -142,12 +142,7 @@ def make_n1():
     jpg_path = OUT / "n1_card.jpg"
     exif_dict = {
         "0th": {
-            piexif.ImageIFD.Artist: "FFD9".encode("ascii"),
-            piexif.ImageIFD.ImageDescription: "not pixels".encode("ascii"),
-        },
-        "Exif": {
-            piexif.ExifIFD.UserComment: b"UNICODE\x00\x00"
-            + "не канал. хвост файла после маркера".encode("utf-16le"),
+            piexif.ImageIFD.Artist: "255,217".encode("ascii"),
         },
     }
     img.save(jpg_path, "JPEG", quality=92, exif=piexif.dump(exif_dict))
@@ -157,7 +152,7 @@ def make_n1():
     raw = jpg_path.read_bytes()
     assert raw[-len(tail):] == tail
     print("  N1  надпись на кадре рисует ведущий на content/n1_carrier.jpg → СМОТРИ ВНУТРЬ")
-    print("  N1  EXIF Artist=FFD9 / comment про хвост файла")
+    print("  N1  EXIF Artist=255,217 (= FF D9), без текстового спойлера")
     print(f"  N1  после FFD9 дописано «{msg}» → СЛОИ")
     return jpg_path
 
