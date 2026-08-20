@@ -38,11 +38,29 @@ class HostFilter(BaseFilter):
 
 # ---- helpers ----------------------------------------------------------------
 
+def _host_print(text: str) -> None:
+    print(f"[HOST] {text}", flush=True)
+
+
 async def notify_host(text: str) -> None:
+    if cfg.HOST_CONSOLE:
+        _host_print(text)
+        return
     try:
         await bot.send_message(cfg.HOST_ID, text)
     except Exception:
         pass
+
+
+async def send_host(text: str, **kwargs) -> None:
+    """Сообщение ведущему (кнопки апрува и т.п.). В HOST_CONSOLE — только stdout."""
+    if cfg.HOST_CONSOLE:
+        _host_print(text)
+        return
+    try:
+        await bot.send_message(cfg.HOST_ID, text, **kwargs)
+    except Exception as e:
+        _host_print(f"не удалось написать ведущему: {e}")
 
 
 def _resolve(arg: str):
@@ -208,6 +226,14 @@ async def _submit_for_approval(uid: int, message: Message) -> None:
     ]])
     caption = T.SUBMIT_RELAY.format(name=_name(player), stage=stage_id,
                                     payload=payload or "(нет)")
+    if cfg.HOST_CONSOLE:
+        _host_print(caption)
+        _host_print(f"HOST_CONSOLE=1 → авто-одобрение sub#{sub_id}")
+        db.set_submission_status(sub_id, "approved")
+        db.log_event(uid, "approved", f"sub#{sub_id} (console)")
+        await message.answer(T.APPROVED_TO_PLAYER)
+        await advance(uid)
+        return
     try:
         if kind in ("photo", "video") and file_id:
             if kind == "photo":
@@ -220,9 +246,9 @@ async def _submit_for_approval(uid: int, message: Message) -> None:
             await bot.send_document(cfg.HOST_ID, file_id, caption=caption,
                                     reply_markup=kb)
         else:
-            await bot.send_message(cfg.HOST_ID, caption, reply_markup=kb)
+            await send_host(caption, reply_markup=kb)
     except Exception as e:
-        await bot.send_message(cfg.HOST_ID, T.SUBMIT_RELAY_FAIL.format(
+        await send_host(T.SUBMIT_RELAY_FAIL.format(
             name=_name(player), stage=stage_id, err=e))
     await message.answer(T.SUBMIT_SENT)
 
@@ -263,12 +289,18 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
                 InlineKeyboardButton("❌ Отклонить", callback_data=f"gate_rej:{uid}"),
             ]])
             await notify_host(T.NEW_PLAYER_GATE.format(name=name, username=username))
-            await bot.send_message(
-                cfg.HOST_ID,
-                f"🆕 {name} (@{username}) ждёт старта.",
-                reply_markup=kb,
-            )
-            await send_stage(uid, "start_gate")
+            if cfg.HOST_CONSOLE:
+                _host_print(f"HOST_CONSOLE=1 → автозапуск игрока {uid} (@{username})")
+                db.set_stage(uid, "prologue")
+                db.log_event(uid, "gate_approved", "console")
+                await send_stage(uid, "prologue")
+                await advance(uid)
+            else:
+                await send_host(
+                    f"🆕 {name} (@{username}) ждёт старта.",
+                    reply_markup=kb,
+                )
+                await send_stage(uid, "start_gate")
         else:
             await message.answer(T.ALREADY_IN_QUEST)
         return
@@ -646,7 +678,8 @@ async def main() -> None:
     db.init_db()
     await bot.delete_webhook(drop_pending_updates=True)
     me = await bot.get_me()
-    print(T.STARTUP.format(username=me.username, host=cfg.HOST_ID))
+    extra = " HOST_CONSOLE=1 (ведущий → консоль, гейт авто)" if cfg.HOST_CONSOLE else ""
+    print(T.STARTUP.format(username=me.username, host=cfg.HOST_ID) + extra)
     await dp.start_polling(bot)
 
 
