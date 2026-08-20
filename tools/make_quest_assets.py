@@ -146,14 +146,14 @@ def make_n1():
         },
     }
     img.save(jpg_path, "JPEG", quality=92, exif=piexif.dump(exif_dict))
-    tail = b"\n" + msg.encode("ascii") + b"\n"
+    tail = b"\nsecret code: " + msg.encode("ascii") + b"\n"
     with jpg_path.open("ab") as f:
         f.write(tail)
     raw = jpg_path.read_bytes()
     assert raw[-len(tail):] == tail
     print("  N1  надпись на кадре рисует ведущий на content/n1_carrier.jpg → СМОТРИ ВНУТРЬ")
     print("  N1  EXIF Artist=255,217 (= FF D9), без текстового спойлера")
-    print(f"  N1  после FFD9 дописано «{msg}» → СЛОИ")
+    print(f"  N1  после FFD9 дописано «secret code: {msg}» → СЛОИ")
     return jpg_path
 
 
