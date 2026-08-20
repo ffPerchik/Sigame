@@ -144,6 +144,10 @@ def make_n1():
         "0th": {
             piexif.ImageIFD.Artist: "255,217".encode("ascii"),
         },
+        "Exif": {
+            piexif.ExifIFD.UserComment: b"UNICODE\x00\x00"
+            + 'Ищи "secret code" в битах'.encode("utf-16le"),
+        },
     }
     img.save(jpg_path, "JPEG", quality=92, exif=piexif.dump(exif_dict))
     tail = b"\nsecret code: " + msg.encode("ascii") + b"\n"
