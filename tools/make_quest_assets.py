@@ -115,27 +115,10 @@ def draw_pigpen(draw: ImageDraw.ImageDraw, xy: tuple[int, int], ch: str, scale=1
 
 
 def _n1_still() -> Image.Image:
-    """Свой кадр для N1 — не stego_carrier / финал SIGame."""
-    w, h = 1200, 800
-    rng = np.random.default_rng(1001)
-    yy, xx = np.mgrid[0:h, 0:w]
-    cx, cy = 600.0, 390.0
-    r = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
-    ang = np.arctan2(yy - cy, xx - cx)
-    ring = np.sin(r / 14.0) * 0.5 + 0.5
-    spoke = np.cos(ang * 6) * 0.5 + 0.5
-    scan = ((yy // 3) % 2) * 18
-    grain = rng.integers(0, 28, (h, w))
-    rch = np.clip(18 + ring * 70 + spoke * 25 + scan + grain * 0.3, 0, 255)
-    gch = np.clip(22 + ring * 90 + (1 - spoke) * 20 + grain * 0.25, 0, 255)
-    bch = np.clip(28 + (1 - ring) * 80 + spoke * 40 + grain * 0.2, 0, 255)
-    arr = np.dstack([rch, gch, bch]).astype(np.uint8)
-    img = Image.fromarray(arr)
-    d = ImageDraw.Draw(img)
-    d.ellipse((cx - 220, cy - 220, cx + 220, cy + 220), outline=(200, 210, 180), width=3)
-    d.ellipse((cx - 90, cy - 90, cx + 90, cy + 90), outline=(240, 230, 160), width=2)
-    d.text((40, 28), "FRAME 00 / INTERCEPT", fill=(180, 190, 160), font=font(22))
-    return img
+    """Свой кадр для N1 — content/n1_carrier.jpg, не финал SIGame."""
+    src = ROOT / "content" / "n1_carrier.jpg"
+    img = Image.open(src).convert("RGB")
+    return img.resize((1200, 800))
 
 
 def make_n1():
