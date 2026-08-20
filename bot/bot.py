@@ -285,8 +285,8 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
             name = message.from_user.full_name
             username = message.from_user.username or "—"
             kb = InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton("✅ Запустить", callback_data=f"gate_appr:{uid}"),
-                InlineKeyboardButton("❌ Отклонить", callback_data=f"gate_rej:{uid}"),
+                InlineKeyboardButton(text="✅ Запустить", callback_data=f"gate_appr:{uid}"),
+                InlineKeyboardButton(text="❌ Отклонить", callback_data=f"gate_rej:{uid}"),
             ]])
             await notify_host(T.NEW_PLAYER_GATE.format(name=name, username=username))
             if cfg.HOST_CONSOLE:
