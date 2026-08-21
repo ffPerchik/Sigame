@@ -1,4 +1,4 @@
-"""Загрузка и проверка квеста (quest/stages.yaml).Поддержка хаб-модели: welcome, start_gate, nodes, stages. """
+"""Загрузка квеста: пролог, гейт перед хабом, шесть независимых узлов."""
 import re
 from collections import OrderedDict
 from typing import Optional
@@ -28,8 +28,8 @@ def entry_code() -> str:
 
 
 def first_stage() -> str:
-    """Первая стадия после /start <код> + приветствия — start_gate."""
-    return "start_gate"
+    """Первая стадия пролога сразу после /start <код>."""
+    return "z_1"
 
 
 # ---- Приветствие ----

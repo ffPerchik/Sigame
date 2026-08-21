@@ -1,7 +1,7 @@
 """Telegram-бот квеста ARGVS-1001: хаб-модель, 6 независимых узлов.
 
 Хаб с кнопками: игрок выбирает узел -> проходит целиком -> возвращается в хаб.
-Точка-пауза (start_gate) после /start <код> до апрува ведущего.
+Точка-пауза стоит после пролога: ведущий открывает настоящий квест перед хабом.
 """
 import asyncio
 from pathlib import Path
@@ -27,6 +27,10 @@ except ImportError:  # `python bot/bot.py` или запуск из папки b
     from argus import send_lines as send_argus_lines
 
 BASE = Path(__file__).resolve().parent
+INTRO_STAGE = quest.first_stage()
+QUEST_GATE_STAGE = "quest_gate"
+QUEST_UNLOCKED_STAGE = "quest_unlocked"
+GATE_STAGES = {"start_gate", QUEST_GATE_STAGE}  # start_gate — совместимость со старой БД
 
 if cfg.PROXY:
     _session = AiohttpSession(proxy=cfg.PROXY)
@@ -129,6 +133,30 @@ async def send_stage(uid: int, stage_id: str) -> None:
         await bot.send_message(uid, text)
 
 
+async def _request_quest_gate(uid: int) -> None:
+    """Просит ведущего открыть основной квест после завершения пролога."""
+    player = db.get_player(uid)
+    if not player:
+        return
+    name = player["name"] or player["username"] or str(uid)
+
+    if cfg.HOST_CONSOLE:
+        _host_print(f"HOST_CONSOLE=1 → автооткрытие основного квеста для {uid}")
+        db.set_stage(uid, QUEST_UNLOCKED_STAGE)
+        db.log_event(uid, "quest_gate_approved", "console")
+        await send_stage(uid, QUEST_UNLOCKED_STAGE)
+        await advance(uid)
+        return
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Открыть квест", callback_data=f"gate_appr:{uid}"),
+    ]])
+    await send_host(
+        T.QUEST_GATE_HOST.format(name=name, uid=uid),
+        reply_markup=kb,
+    )
+
+
 # ======================== HUB ===============================================
 
 async def _send_hub(uid: int) -> None:
@@ -193,6 +221,10 @@ async def advance(uid: int) -> None:
     if cfg.NOTIFY_HOST:
         await notify_host(T.ADVANCE_HOST.format(name=name, cur=cur, nxt=nxt))
     await send_stage(uid, nxt)
+
+    if quest.is_gate(nxt):
+        await _request_quest_gate(uid)
+        return
 
     if nxt == "hub":
         return
@@ -286,7 +318,7 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
     if payload and payload == quest.entry_code():
         if player is None:
             db.register(uid, message.from_user.username or "",
-                        message.from_user.full_name, "start_gate")
+                        message.from_user.full_name, INTRO_STAGE)
             db.log_event(uid, "register")
 
             # Приветствие из YAML welcome
@@ -303,25 +335,10 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
             else:
                 await bot.send_message(uid, welcome_text)
 
-            # Кнопки ведущему
             name = message.from_user.full_name
             username = message.from_user.username or "—"
-            kb = InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton(text="✅ Запустить", callback_data=f"gate_appr:{uid}"),
-                InlineKeyboardButton(text="❌ Отклонить", callback_data=f"gate_rej:{uid}"),
-            ]])
-            await notify_host(T.NEW_PLAYER_GATE.format(name=name, username=username))
-            if cfg.HOST_CONSOLE:
-                _host_print(f"HOST_CONSOLE=1 → автозапуск игрока {uid} (@{username})")
-                db.set_stage(uid, "z_1")
-                db.log_event(uid, "gate_approved", "console")
-                await send_stage(uid, "z_1")
-            else:
-                await send_host(
-                    f"🆕 {name} (@{username}) ждёт старта.",
-                    reply_markup=kb,
-                )
-                await send_stage(uid, "start_gate")
+            await notify_host(T.NEW_PLAYER_INTRO.format(name=name, username=username))
+            await send_stage(uid, INTRO_STAGE)
         else:
             await message.answer(T.ALREADY_IN_QUEST)
         return
@@ -344,15 +361,19 @@ async def cb_gate_approve(cq: CallbackQuery) -> None:
     if cq.from_user.id != cfg.HOST_ID:
         return await cq.answer(T.ONLY_HOST, show_alert=True)
     uid = int(cq.data.split(":", 1)[1])
-    db.set_stage(uid, "z_1")
-    db.log_event(uid, "gate_approved")
-    await cq.answer("✅ Игрок запущен!")
+    player = db.get_player(uid)
+    if not player or player["stage"] != QUEST_GATE_STAGE:
+        return await cq.answer("Игрок уже ушёл с точки запуска.", show_alert=True)
+    db.set_stage(uid, QUEST_UNLOCKED_STAGE)
+    db.log_event(uid, "quest_gate_approved")
+    await cq.answer("✅ Основной квест открыт!")
     try:
         await cq.message.edit_reply_markup(reply_markup=None)
     except Exception:
         pass
     await notify_host(T.GATE_APPROVED.format(uid=uid))
-    await send_stage(uid, "z_1")
+    await send_stage(uid, QUEST_UNLOCKED_STAGE)
+    await advance(uid)
 
 
 @dp.callback_query(F.data.startswith("gate_rej:"))
@@ -360,8 +381,11 @@ async def cb_gate_reject(cq: CallbackQuery) -> None:
     if cq.from_user.id != cfg.HOST_ID:
         return await cq.answer(T.ONLY_HOST, show_alert=True)
     uid = int(cq.data.split(":", 1)[1])
-    db.log_event(uid, "gate_rejected")
-    await cq.answer("❌ Отклонён")
+    player = db.get_player(uid)
+    if not player or player["stage"] != QUEST_GATE_STAGE:
+        return await cq.answer("Игрок уже ушёл с точки запуска.", show_alert=True)
+    db.log_event(uid, "quest_gate_rejected")
+    await cq.answer("❌ Основной квест пока закрыт")
     try:
         await cq.message.edit_reply_markup(reply_markup=None)
     except Exception:
@@ -410,7 +434,7 @@ async def cmd_progress(message: Message) -> None:
     bal = p["banked"] or 0
     if p["finished_at"]:
         return await message.answer(T.PROGRESS_FINISHED.format(bal=bal))
-    if p["stage"] == "start_gate":
+    if p["stage"] in GATE_STAGES:
         return await message.answer(T.PROGRESS_GATE)
     await message.answer(T.PROGRESS_STAGE_HEADER.format(stage=p["stage"], bal=bal))
     await send_stage(uid, p["stage"])
@@ -422,7 +446,7 @@ async def cmd_hint(message: Message) -> None:
     p = db.get_player(uid)
     if not p:
         return await message.answer(T.HINT_NEED_START)
-    if p["stage"] in ("start_gate", "hub"):
+    if p["stage"] in GATE_STAGES or p["stage"] == "hub":
         return await message.answer(T.NO_HINT_HERE)
     st = quest.get_stage(p["stage"])
     hint = st.get("hint") if st else None
@@ -464,7 +488,7 @@ async def cmd_hub(message: Message) -> None:
         return await message.answer(T.NOT_IN_QUEST)
     if p["stage"] == "hub":
         await _send_hub(uid)
-    elif p["stage"] == "start_gate":
+    elif p["stage"] in GATE_STAGES:
         await message.answer(T.IN_GATE)
     else:
         await message.answer(T.NO_HUB_MID_NODE)
@@ -617,8 +641,8 @@ async def cmd_reset(message: Message, command: Command) -> None:
     if not args:
         return await message.answer(T.RESET_USAGE)
     uid = int(args[0])
-    db.set_stage(uid, "start_gate")
-    await message.answer(T.RESET_DONE.format(uid=uid, stage="start_gate"))
+    db.set_stage(uid, INTRO_STAGE)
+    await message.answer(T.RESET_DONE.format(uid=uid, stage=INTRO_STAGE))
 
 
 @dp.message(HostFilter(), Command("approve"))
@@ -666,7 +690,7 @@ async def on_message(message: Message) -> None:
         await message.answer(T.START_FIRST)
         return
 
-    if player["stage"] == "start_gate":
+    if player["stage"] in GATE_STAGES:
         await message.answer(T.IN_GATE)
         return
 
@@ -696,6 +720,12 @@ async def on_message(message: Message) -> None:
 
 async def main() -> None:
     db.init_db()
+    # Старые тестовые БД могли сохранить гейт до пролога. После переноса гейта
+    # возвращаем таких игроков на первую задачу Жени.
+    for player in db.all_players():
+        if player["stage"] == "start_gate":
+            db.set_stage(player["user_id"], INTRO_STAGE)
+            db.log_event(player["user_id"], "stage_migrated", "start_gate -> z_1")
     await bot.delete_webhook(drop_pending_updates=True)
     me = await bot.get_me()
     extra = " HOST_CONSOLE=1 (ведущий → консоль, гейт авто)" if cfg.HOST_CONSOLE else ""
