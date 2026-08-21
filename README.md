@@ -61,11 +61,12 @@ python tools/sigame_achievements.py path/to/game-log.txt
 Список ачивок и инструкция —
 [`doc/SIGAME_ACHIEVEMENTS.md`](doc/SIGAME_ACHIEVEMENTS.md).
 
-## TODO
+## Квест после входа
 
-`START.txt` — первый слой. Дальше можно наращивать: стегано в других картинках,
-акростих по ответам, QR, запароленные zip-in-zip, шифры (Цезарь/Виженер),
-реальные точки (координаты).
+Telegram-бот (`bot/`), хаб на 6 независимых узлов. В каждом узле несколько
+слоёв (LSB, Морзе, Виженер, книжный шифр, спектр, HTML-исходник и т.д.).
+Сценарий: `bot/quest/stages.yaml`. Разгадка для ведущего: `doc/QUEST_WALKTHROUGH.md`.
+Ассеты: `python3 tools/make_quest_assets.py`.
 
 ## Примечание
 

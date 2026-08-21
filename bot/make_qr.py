@@ -6,6 +6,9 @@
 Картинки кладутся в bot/qr/<stage_id>.png.
 
     python3 bot/make_qr.py
+
+В stages.yaml у стадии: qr: true и accept: [\"КОД\"].
+Пока таких стадий нет — скрипт просто ничего не нарисует.
 """
 import os
 import sys
@@ -13,7 +16,6 @@ from pathlib import Path
 
 import qrcode
 
-# конфиг без жёсткой проверки токена
 os.environ.setdefault("BOT_TOKEN", "0:skip")
 os.environ.setdefault("HOST_ID", "1")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -25,7 +27,7 @@ OUT.mkdir(exist_ok=True)
 
 if not cfg.BOT_USERNAME:
     print("ВНИМАНИЕ: BOT_USERNAME не задан в .env — QR будут без ссылки на бота.")
-    base = "https://t.me/?start="  # заглушка
+    base = "https://t.me/?start="
 else:
     base = f"https://t.me/{cfg.BOT_USERNAME}?start="
 
@@ -37,4 +39,7 @@ for stage_id, code in quest.qr_stages().items():
     print(f"  {stage_id}.png  ←  {url}")
     n += 1
 
-print(f"\nГотово: {n} QR в {OUT}. Распечатай и спрячь на локациях.")
+if n == 0:
+    print("qr-стадий в stages.yaml нет (нужно qr: true и accept: [код]).")
+else:
+    print(f"\nГотово: {n} QR в {OUT}. Распечатай и спрячь на локациях.")
