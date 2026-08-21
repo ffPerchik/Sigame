@@ -34,7 +34,7 @@ def first_stage() -> str:
 
 # ---- Приветствие ----
 def welcome_info() -> dict:
-    """Возвращает {text, image?} из секции welcome."""
+    """Возвращает {text, image?, speaker?, delay?} из секции welcome."""
     q = load()
     return q.get("welcome", {})
 

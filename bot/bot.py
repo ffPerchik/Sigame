@@ -4,6 +4,7 @@
 После пролога ARGVS требует ключ активации, найденный внутри пакета SIGame.
 """
 import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher, F
@@ -13,6 +14,7 @@ from aiogram.filters import BaseFilter, Command, CommandStart
 from aiogram.types import (
     CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message,
 )
+from aiogram.utils.chat_action import ChatActionSender
 
 try:  # `python -m bot.bot`
     from . import config as cfg
@@ -73,6 +75,20 @@ async def send_host(text: str, **kwargs) -> None:
         _host_print(f"не удалось написать ведущему: {e}")
 
 
+@asynccontextmanager
+async def _speaker_activity(uid: int, speaker: str | None):
+    """Показывает настоящий Telegram-индикатор для реплик Жени."""
+    if speaker == "zhenya":
+        async with ChatActionSender.typing(bot=bot, chat_id=uid):
+            yield
+    else:
+        yield
+
+
+def _message_activity(uid: int):
+    return lambda item: _speaker_activity(uid, item.speaker)
+
+
 def _resolve(arg: str):
     arg = (arg or "").strip().lstrip("@")
     if arg.isdigit():
@@ -102,40 +118,44 @@ async def send_stage(uid: int, stage_id: str) -> None:
         await send_timed_messages(
             messages,
             lambda line: bot.send_message(uid, line),
+            activity=_message_activity(uid),
         )
 
     text = (st.get("text") or "").strip()
     media_dir = BASE / "quest" / "images"
     has_media = any(st.get(field) for field in ("image", "audio", "video", "document"))
-    if text or has_media:
+    if not (text or has_media):
+        return
+
+    async with _speaker_activity(uid, st.get("speaker")):
         # `delay` относится только к следующему обычному сообщению/медиа стадии
         # и всегда отрабатывает ДО него, никогда после.
         await wait_before(st.get("delay", 0.0))
-    media_senders = {
-        "image": (bot.send_photo, "photo"),
-        "audio": (bot.send_audio, "audio"),
-        "video": (bot.send_video, "video"),
-        "document": (bot.send_document, "document"),
-    }
-    for field in ("image", "audio", "video", "document"):
-        raw_reference = st.get(field)
-        if not raw_reference:
-            continue
-        try:
-            spec = parse_media_spec(raw_reference)
-            actual_field = delivery_field(field, spec)
-        except ValueError as e:
-            print(T.MEDIA_SPEC_FAIL.format(field=field, value=raw_reference, err=e))
-            continue
-        sender, kind_label = media_senders[actual_field]
-        path = Path(spec.path) if Path(spec.path).is_absolute() else media_dir / spec.path
-        try:
-            await sender(uid, FSInputFile(path), caption=text)
-            return
-        except Exception as e:
-            print(T.MEDIA_FAIL.format(kind=kind_label, path=path, err=e))
-    if text:
-        await bot.send_message(uid, text)
+        media_senders = {
+            "image": (bot.send_photo, "photo"),
+            "audio": (bot.send_audio, "audio"),
+            "video": (bot.send_video, "video"),
+            "document": (bot.send_document, "document"),
+        }
+        for field in ("image", "audio", "video", "document"):
+            raw_reference = st.get(field)
+            if not raw_reference:
+                continue
+            try:
+                spec = parse_media_spec(raw_reference)
+                actual_field = delivery_field(field, spec)
+            except ValueError as e:
+                print(T.MEDIA_SPEC_FAIL.format(field=field, value=raw_reference, err=e))
+                continue
+            sender, kind_label = media_senders[actual_field]
+            path = Path(spec.path) if Path(spec.path).is_absolute() else media_dir / spec.path
+            try:
+                await sender(uid, FSInputFile(path), caption=text)
+                return
+            except Exception as e:
+                print(T.MEDIA_FAIL.format(kind=kind_label, path=path, err=e))
+        if text:
+            await bot.send_message(uid, text)
 
 
 # ======================== HUB ===============================================
@@ -312,15 +332,17 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
     welcome = quest.welcome_info()
     welcome_text = welcome.get("text", T.WELCOME)
     welcome_image = welcome.get("image")
-    if welcome_image:
-        path = (Path(welcome_image) if Path(welcome_image).is_absolute()
-                else BASE / "quest" / "images" / welcome_image)
-        try:
-            await bot.send_photo(uid, FSInputFile(path), caption=welcome_text)
-        except Exception:
+    async with _speaker_activity(uid, welcome.get("speaker")):
+        await wait_before(welcome.get("delay", 0.0))
+        if welcome_image:
+            path = (Path(welcome_image) if Path(welcome_image).is_absolute()
+                    else BASE / "quest" / "images" / welcome_image)
+            try:
+                await bot.send_photo(uid, FSInputFile(path), caption=welcome_text)
+            except Exception:
+                await bot.send_message(uid, welcome_text)
+        else:
             await bot.send_message(uid, welcome_text)
-    else:
-        await bot.send_message(uid, welcome_text)
 
     name = message.from_user.full_name
     username = message.from_user.username or "—"

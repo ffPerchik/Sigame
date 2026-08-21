@@ -5,6 +5,7 @@ import asyncio
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
+from typing import AsyncContextManager
 
 try:
     from .argus import format_line as format_argus_line
@@ -53,9 +54,15 @@ async def send_messages(
     *,
     sleep: Callable[[float], Awaitable[object]] = asyncio.sleep,
     now_factory: Callable[[], datetime] | None = None,
+    activity: Callable[[TimedMessage], AsyncContextManager[object] | None] | None = None,
 ) -> None:
-    """Ждёт delay каждого элемента, затем отправляет именно этот элемент."""
-    for item in normalize_messages(items):
+    """Ждёт delay каждого элемента, затем отправляет именно этот элемент.
+
+    `activity` позволяет держать Telegram chat action (например, typing) активным
+    во время ожидания и до фактической отправки сообщения.
+    """
+
+    async def deliver(item: TimedMessage) -> None:
         if item.delay:
             await sleep(item.delay)
         if item.speaker == "argus":
@@ -64,6 +71,14 @@ async def send_messages(
         else:
             text = item.text
         await send(text)
+
+    for item in normalize_messages(items):
+        context = activity(item) if activity else None
+        if context is None:
+            await deliver(item)
+        else:
+            async with context:
+                await deliver(item)
 
 
 async def wait_before(

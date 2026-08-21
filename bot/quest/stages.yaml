@@ -4,9 +4,12 @@ entry_code: "ARGUS1001"
 
 # Поле `messages:` — последовательность сообщений. У каждого `delay` означает
 # паузу ПЕРЕД именно этим сообщением. `speaker: argus` добавляет реальное время
-# и префикс ARGVS-1001; обычные сообщения используют тот же механизм задержек.
+# и префикс ARGVS-1001; `speaker: zhenya` включает Telegram-индикатор «печатает»
+# на время задержки и отправки. Обычные сообщения используют те же задержки.
 
 welcome:
+  speaker: zhenya
+  delay: 1.5
   text: |
     Привет. Это Женя.
 
@@ -26,6 +29,8 @@ stages:
 
   z_1:
     mode: auto
+    speaker: zhenya
+    delay: 1.5
     text: |
       Это мой первый опыт, я очень старался, да, сначала будет просто, но мы разгонемся, обещаю!!!
 
@@ -51,6 +56,8 @@ stages:
 
   z_2:
     mode: auto
+    speaker: zhenya
+    delay: 1.5
     text: |
       ээ-м... это не я писал... лаг какой-то... Да ладно, неважно
 
@@ -77,6 +84,8 @@ stages:
 
   z_3:
     mode: info
+    speaker: zhenya
+    delay: 1.5
     text: |
       Чё, какой 25? 25% чего? Какой к чёрту канал, ты тоже видишь эти сообщения? 
       Я сейчас перезапущу бота. подожди, вот ещё одна задачка, пока перезапускается.
@@ -109,6 +118,8 @@ stages:
 
   z_fix50:
     mode: info
+    speaker: zhenya
+    delay: 1.5
     text: |
       Женя: я откатываю апдейт, не пишите в чат что «взлом». это баг.
       Цезарь снова, сдвиг +1: ТУБСУ
@@ -116,6 +127,8 @@ stages:
 
   z_c3:
     mode: auto
+    speaker: zhenya
+    delay: 1.5
     text: |
       Слово.
     accept:
@@ -138,6 +151,8 @@ stages:
 
   z_fix75:
     mode: info
+    speaker: zhenya
+    delay: 1.5
     text: |
       Женя: отойти от какого канала. это мой бот.
 
@@ -146,6 +161,8 @@ stages:
 
   z_morse_easy:
     mode: auto
+    speaker: zhenya
+    delay: 1.5
     text: |
       Две буквы. Точка-тире, не надо Audacity.
     accept:
@@ -168,8 +185,9 @@ stages:
   z_hack:
     mode: info
     messages:
-      - text: "Женя: нет нет нет подож—"
-        delay: 0.5
+      - speaker: zhenya
+        delay: 1.5
+        text: "Женя: нет нет нет подож—"
       - {speaker: argus, delay: 0.5, text: "TERMINATING HOST SESSION…"}
       - {speaker: argus, delay: 0.5, text: "TRACE STATUS: CLEAR"}
       - {speaker: argus, delay: 0.5, text: "CONNECTION OWNER: ARGVS-1001"}

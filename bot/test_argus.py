@@ -1,5 +1,6 @@
 import sys
 import unittest
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -58,6 +59,37 @@ class TimedMessagesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sent[2][0], datetime(2026, 8, 22, 12, 0, 3, 500000, tzinfo=timezone.utc))
         self.assertEqual(sent[2][1], "[12:00:03.500] ARGVS-1001 // TWO")
 
+    async def test_activity_wraps_delay_and_message_send(self):
+        events = []
+
+        @asynccontextmanager
+        async def activity(item):
+            events.append(("activity_started", item.speaker))
+            try:
+                yield
+            finally:
+                events.append(("activity_finished", item.speaker))
+
+        async def sleep(delay):
+            events.append(("delay", delay))
+
+        async def send(text):
+            events.append(("sent", text))
+
+        await send_messages(
+            [{"speaker": "zhenya", "text": "Печатаю", "delay": 1.5}],
+            send,
+            sleep=sleep,
+            activity=activity,
+        )
+
+        self.assertEqual(events, [
+            ("activity_started", "zhenya"),
+            ("delay", 1.5),
+            ("sent", "Печатаю"),
+            ("activity_finished", "zhenya"),
+        ])
+
     def test_quest_uses_generic_message_delays(self):
         stages = (REPO_ROOT / "bot" / "quest" / "stages.yaml").read_text(encoding="utf-8")
         self.assertNotIn("argus_delay:", stages)
@@ -65,6 +97,24 @@ class TimedMessagesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("messages:", stages)
         self.assertIn("speaker: argus", stages)
         self.assertIn("delay: 0.5", stages)
+
+    def test_zhenya_replies_enable_typing_with_visible_delays(self):
+        stages = (REPO_ROOT / "bot" / "quest" / "stages.yaml").read_text(encoding="utf-8")
+        self.assertIn("welcome:\n  speaker: zhenya\n  delay: 1.5", stages)
+        zhenya_stages = (
+            "z_1", "z_2", "z_3", "z_fix50", "z_c3", "z_fix75", "z_morse_easy",
+        )
+        for stage_id in zhenya_stages:
+            self.assertIn(
+                f"  {stage_id}:\n    mode: ",
+                stages,
+            )
+            block = stages.split(f"  {stage_id}:\n", 1)[1].split("\n\n  ", 1)[0]
+            self.assertIn("\n    speaker: zhenya\n    delay: 1.5", block)
+        self.assertIn(
+            "      - speaker: zhenya\n        delay: 1.5\n        text: \"Женя: нет нет нет подож—\"",
+            stages,
+        )
 
     async def test_stage_delay_waits_before_main_message(self):
         sleeps = []
