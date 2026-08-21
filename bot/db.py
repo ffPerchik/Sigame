@@ -3,7 +3,10 @@ import sqlite3
 import time
 from typing import Optional
 
-from config import DB_PATH
+try:
+    from .config import DB_PATH
+except ImportError:  # прямой запуск файлов из папки bot
+    from config import DB_PATH
 
 
 def _conn() -> sqlite3.Connection:

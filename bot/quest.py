@@ -5,7 +5,10 @@ from typing import Optional
 
 import yaml
 
-from config import QUEST_FILE
+try:
+    from .config import QUEST_FILE
+except ImportError:  # прямой запуск файлов из папки bot
+    from config import QUEST_FILE
 
 _QUEST: Optional[dict] = None
 

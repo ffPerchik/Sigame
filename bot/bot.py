@@ -14,10 +14,15 @@ from aiogram.types import (
     CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message,
 )
 
-import config as cfg
-import db
-import quest
-import texts as T
+try:  # `python -m bot.bot`
+    from . import config as cfg
+    from . import db, quest
+    from . import texts as T
+except ImportError:  # `python bot/bot.py` или запуск из папки bot
+    import config as cfg
+    import db
+    import quest
+    import texts as T
 
 BASE = Path(__file__).resolve().parent
 

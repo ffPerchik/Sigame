@@ -1,10 +1,18 @@
 import io
 import os
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
+
+# При прямом запуске файла Python добавляет в sys.path только bot/tools, а не
+# корень репозитория. Добавляем его явно, чтобы одинаково работали оба варианта:
+# `python bot/tools/test_sigame_achievements.py` и `python -m unittest ...`.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 import bot.tools.sigame_achievements as achievements
 from bot.tools.sigame_achievements import (
@@ -115,9 +123,20 @@ Alice: Right: 1/100, Wrong: 0/0
             self.assertNotIn("/addhint", report)
 
     def test_loads_question_context_from_package(self):
-        index = load_package_questions(Path("zengame.siq"))
+        index = load_package_questions(achievements.REPO_ROOT / "zengame.siq")
         context = index[("🎬 Кинчик", 100)]
         self.assertEqual(context.round_name, "Киномания")
+
+    def test_refactored_paths_exist(self):
+        self.assertEqual(achievements.BOT_ROOT, REPO_ROOT / "bot")
+        self.assertEqual(
+            achievements.REPORTS_DIR,
+            REPO_ROOT / "bot" / "quest" / "achievements",
+        )
+        self.assertTrue((achievements.REPO_ROOT / "zengame.siq").is_file())
+        self.assertTrue((REPO_ROOT / "bot" / "quest" / "source" / "n1_carrier.jpg").is_file())
+        self.assertTrue((REPO_ROOT / "bot" / "tools" / "fonts" / "DejaVuSans.ttf").is_file())
+        self.assertTrue((REPO_ROOT / "bot" / "docs" / "QUEST_WALKTHROUGH.md").is_file())
 
     def test_finds_latest_steam_log_by_default(self):
         with tempfile.TemporaryDirectory() as temp_dir:

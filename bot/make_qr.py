@@ -18,9 +18,14 @@ import qrcode
 
 os.environ.setdefault("BOT_TOKEN", "0:skip")
 os.environ.setdefault("HOST_ID", "1")
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import config as cfg  # noqa: E402
-import quest  # noqa: E402
+
+if __package__:
+    from . import config as cfg
+    from . import quest
+else:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import config as cfg  # noqa: E402
+    import quest  # noqa: E402
 
 OUT = Path(__file__).resolve().parent / "qr"
 OUT.mkdir(exist_ok=True)
