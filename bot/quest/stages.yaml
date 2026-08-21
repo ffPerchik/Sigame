@@ -189,21 +189,27 @@ stages:
     next: quest_gate
 
   quest_gate:
-    mode: gate
+    mode: auto
+    accept_entry_code: true
+    correct_text: ""
+    wrong_argus: "КЛЮЧ ОТКЛОНЁН. ВЕРНИСЬ К КОНТЕЙНЕРУ SIGAME И ИЩИ ВНИМАТЕЛЬНЕЕ."
     argus_delay: 0.5
     argus:
       - "ПРОЛОГ ЗАВЕРШЁН"
       - "ОСНОВНОЙ ПРОТОКОЛ: LOCKED"
       - "ШЕСТЬ УЗЛОВ ПОДГОТОВЛЕНЫ"
-      - "ОЖИДАЮ ВНЕШНЕГО СИГНАЛА ДЛЯ ЗАПУСКА"
-    text: |
-      Ты дошёл до настоящего квеста. Канал заблокирован до сигнала ведущего.
+      - "ДОПУСК ТРЕБУЕТ КЛЮЧ АКТИВАЦИИ ИЗ КОНТЕЙНЕРА SIGAME"
+      - "ВВЕДИ КЛЮЧ. ДОКАЖИ, ЧТО ВЫ НЕ БЕЗНАДЁЖНЫ."
+    hint: |
+      Ключ был спрятан внутри zengame.siq рядом с посланием, которое привело тебя в бот.
+    next: quest_unlocked
 
   quest_unlocked:
     mode: info
     argus_delay: 0.5
     argus:
-      - "EXTERNAL SIGNAL ACCEPTED"
+      - "ACTIVATION KEY ACCEPTED"
+      - "ПРОВЕРКА ЗАВЕРШЕНА: ВЫ НЕ БЕЗНАДЁЖНЫ"
       - "ОСНОВНОЙ ПРОТОКОЛ: UNLOCKED"
       - "ДОСТУП К ШЕСТИ УЗЛАМ РАЗРЕШЁН"
     next: hub

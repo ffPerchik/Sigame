@@ -28,7 +28,6 @@ if _raw_host.endswith("_1"):
     HOST_CONSOLE = True
     _raw_host = _raw_host[: -2]
 HOST_ID = int(_raw_host or "0")
-ENTRY_CODE = os.environ.get("ENTRY_CODE", "ZENGAME2026")
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "").lstrip("@")
 # Прокси для обхода блокировки api.telegram.org (Россия). Форматы:
 #   http://host:port          http://user:pass@host:port

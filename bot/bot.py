@@ -1,7 +1,7 @@
 """Telegram-бот квеста ARGVS-1001: хаб-модель, 6 независимых узлов.
 
 Хаб с кнопками: игрок выбирает узел -> проходит целиком -> возвращается в хаб.
-Точка-пауза стоит после пролога: ведущий открывает настоящий квест перед хабом.
+После пролога ARGVS требует ключ активации, найденный внутри пакета SIGame.
 """
 import asyncio
 from pathlib import Path
@@ -28,9 +28,6 @@ except ImportError:  # `python bot/bot.py` или запуск из папки b
 
 BASE = Path(__file__).resolve().parent
 INTRO_STAGE = quest.first_stage()
-QUEST_GATE_STAGE = "quest_gate"
-QUEST_UNLOCKED_STAGE = "quest_unlocked"
-GATE_STAGES = {"start_gate", QUEST_GATE_STAGE}  # start_gate — совместимость со старой БД
 
 if cfg.PROXY:
     _session = AiohttpSession(proxy=cfg.PROXY)
@@ -133,30 +130,6 @@ async def send_stage(uid: int, stage_id: str) -> None:
         await bot.send_message(uid, text)
 
 
-async def _request_quest_gate(uid: int) -> None:
-    """Просит ведущего открыть основной квест после завершения пролога."""
-    player = db.get_player(uid)
-    if not player:
-        return
-    name = player["name"] or player["username"] or str(uid)
-
-    if cfg.HOST_CONSOLE:
-        _host_print(f"HOST_CONSOLE=1 → автооткрытие основного квеста для {uid}")
-        db.set_stage(uid, QUEST_UNLOCKED_STAGE)
-        db.log_event(uid, "quest_gate_approved", "console")
-        await send_stage(uid, QUEST_UNLOCKED_STAGE)
-        await advance(uid)
-        return
-
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ Открыть квест", callback_data=f"gate_appr:{uid}"),
-    ]])
-    await send_host(
-        T.QUEST_GATE_HOST.format(name=name, uid=uid),
-        reply_markup=kb,
-    )
-
-
 # ======================== HUB ===============================================
 
 async def _send_hub(uid: int) -> None:
@@ -222,10 +195,6 @@ async def advance(uid: int) -> None:
         await notify_host(T.ADVANCE_HOST.format(name=name, cur=cur, nxt=nxt))
     await send_stage(uid, nxt)
 
-    if quest.is_gate(nxt):
-        await _request_quest_gate(uid)
-        return
-
     if nxt == "hub":
         return
 
@@ -249,11 +218,22 @@ async def _try_answer(uid: int, message: Message, text: str) -> None:
     st = quest.get_stage(player["stage"]) if player else None
     if not st or st.get("mode") != "auto":
         return
-    if quest.validate(st.get("accept", []), text):
-        await message.answer(T.CORRECT)
+    accepted = [quest.entry_code()] if st.get("accept_entry_code") else st.get("accept", [])
+    if quest.validate(accepted, text):
+        correct_text = st.get("correct_text", T.CORRECT)
+        if correct_text:
+            await message.answer(correct_text)
         await advance(uid)
     else:
-        await message.answer(T.WRONG)
+        wrong_argus = st.get("wrong_argus")
+        if wrong_argus:
+            await send_argus_lines(
+                [wrong_argus],
+                lambda line: message.answer(line),
+                delay=0,
+            )
+        else:
+            await message.answer(st.get("wrong_text", T.WRONG))
 
 
 async def _submit_for_approval(uid: int, message: Message) -> None:
@@ -312,86 +292,33 @@ async def _submit_for_approval(uid: int, message: Message) -> None:
 @dp.message(CommandStart())
 async def cmd_start(message: Message, command: CommandStart) -> None:
     uid = message.from_user.id
-    payload = (command.args or "").strip()
     player = db.get_player(uid)
-
-    if payload and payload == quest.entry_code():
-        if player is None:
-            db.register(uid, message.from_user.username or "",
-                        message.from_user.full_name, INTRO_STAGE)
-            db.log_event(uid, "register")
-
-            # Приветствие из YAML welcome
-            welcome = quest.welcome_info()
-            welcome_text = welcome.get("text", T.WELCOME)
-            welcome_image = welcome.get("image")
-            if welcome_image:
-                path = (Path(welcome_image) if Path(welcome_image).is_absolute()
-                        else BASE / "quest" / "images" / welcome_image)
-                try:
-                    await bot.send_photo(uid, FSInputFile(path), caption=welcome_text)
-                except Exception:
-                    await bot.send_message(uid, welcome_text)
-            else:
-                await bot.send_message(uid, welcome_text)
-
-            name = message.from_user.full_name
-            username = message.from_user.username or "—"
-            await notify_host(T.NEW_PLAYER_INTRO.format(name=name, username=username))
-            await send_stage(uid, INTRO_STAGE)
-        else:
-            await message.answer(T.ALREADY_IN_QUEST)
+    if player is not None:
+        await message.answer(T.ALREADY_IN_QUEST)
         return
 
-    if not payload:
-        await message.answer(
-            T.ALREADY_IN_QUEST if player is not None else T.NEED_CODE)
-        return
+    # Ключ из SIGame не тратится на вход: он понадобится Аргусу после пролога.
+    db.register(uid, message.from_user.username or "",
+                message.from_user.full_name, INTRO_STAGE)
+    db.log_event(uid, "register")
 
-    if player is None:
-        await message.answer(T.NEED_CODE)
-        return
-    await _try_answer(uid, message, payload)
+    welcome = quest.welcome_info()
+    welcome_text = welcome.get("text", T.WELCOME)
+    welcome_image = welcome.get("image")
+    if welcome_image:
+        path = (Path(welcome_image) if Path(welcome_image).is_absolute()
+                else BASE / "quest" / "images" / welcome_image)
+        try:
+            await bot.send_photo(uid, FSInputFile(path), caption=welcome_text)
+        except Exception:
+            await bot.send_message(uid, welcome_text)
+    else:
+        await bot.send_message(uid, welcome_text)
 
-
-# ======================== gate approve / reject =============================
-
-@dp.callback_query(F.data.startswith("gate_appr:"))
-async def cb_gate_approve(cq: CallbackQuery) -> None:
-    if cq.from_user.id != cfg.HOST_ID:
-        return await cq.answer(T.ONLY_HOST, show_alert=True)
-    uid = int(cq.data.split(":", 1)[1])
-    player = db.get_player(uid)
-    if not player or player["stage"] != QUEST_GATE_STAGE:
-        return await cq.answer("Игрок уже ушёл с точки запуска.", show_alert=True)
-    db.set_stage(uid, QUEST_UNLOCKED_STAGE)
-    db.log_event(uid, "quest_gate_approved")
-    await cq.answer("✅ Основной квест открыт!")
-    try:
-        await cq.message.edit_reply_markup(reply_markup=None)
-    except Exception:
-        pass
-    await notify_host(T.GATE_APPROVED.format(uid=uid))
-    await send_stage(uid, QUEST_UNLOCKED_STAGE)
-    await advance(uid)
-
-
-@dp.callback_query(F.data.startswith("gate_rej:"))
-async def cb_gate_reject(cq: CallbackQuery) -> None:
-    if cq.from_user.id != cfg.HOST_ID:
-        return await cq.answer(T.ONLY_HOST, show_alert=True)
-    uid = int(cq.data.split(":", 1)[1])
-    player = db.get_player(uid)
-    if not player or player["stage"] != QUEST_GATE_STAGE:
-        return await cq.answer("Игрок уже ушёл с точки запуска.", show_alert=True)
-    db.log_event(uid, "quest_gate_rejected")
-    await cq.answer("❌ Основной квест пока закрыт")
-    try:
-        await cq.message.edit_reply_markup(reply_markup=None)
-    except Exception:
-        pass
-    await bot.send_message(uid, T.GATE_REJECTED)
-    await notify_host(T.GATE_REJECTED_HOST.format(uid=uid))
+    name = message.from_user.full_name
+    username = message.from_user.username or "—"
+    await notify_host(T.NEW_PLAYER_INTRO.format(name=name, username=username))
+    await send_stage(uid, INTRO_STAGE)
 
 
 # ======================== node pick (hub buttons) ===========================
@@ -434,8 +361,6 @@ async def cmd_progress(message: Message) -> None:
     bal = p["banked"] or 0
     if p["finished_at"]:
         return await message.answer(T.PROGRESS_FINISHED.format(bal=bal))
-    if p["stage"] in GATE_STAGES:
-        return await message.answer(T.PROGRESS_GATE)
     await message.answer(T.PROGRESS_STAGE_HEADER.format(stage=p["stage"], bal=bal))
     await send_stage(uid, p["stage"])
 
@@ -446,7 +371,7 @@ async def cmd_hint(message: Message) -> None:
     p = db.get_player(uid)
     if not p:
         return await message.answer(T.HINT_NEED_START)
-    if p["stage"] in GATE_STAGES or p["stage"] == "hub":
+    if p["stage"] == "hub":
         return await message.answer(T.NO_HINT_HERE)
     st = quest.get_stage(p["stage"])
     hint = st.get("hint") if st else None
@@ -488,8 +413,6 @@ async def cmd_hub(message: Message) -> None:
         return await message.answer(T.NOT_IN_QUEST)
     if p["stage"] == "hub":
         await _send_hub(uid)
-    elif p["stage"] in GATE_STAGES:
-        await message.answer(T.IN_GATE)
     else:
         await message.answer(T.NO_HUB_MID_NODE)
 
@@ -690,10 +613,6 @@ async def on_message(message: Message) -> None:
         await message.answer(T.START_FIRST)
         return
 
-    if player["stage"] in GATE_STAGES:
-        await message.answer(T.IN_GATE)
-        return
-
     if player["stage"] == "hub":
         await message.answer(T.IN_HUB_USE_BUTTONS)
         return
@@ -728,7 +647,7 @@ async def main() -> None:
             db.log_event(player["user_id"], "stage_migrated", "start_gate -> z_1")
     await bot.delete_webhook(drop_pending_updates=True)
     me = await bot.get_me()
-    extra = " HOST_CONSOLE=1 (ведущий → консоль, гейт авто)" if cfg.HOST_CONSOLE else ""
+    extra = " HOST_CONSOLE=1 (уведомления ведущего → консоль)" if cfg.HOST_CONSOLE else ""
     print(T.STARTUP.format(username=me.username, host=cfg.HOST_ID) + extra)
     await dp.start_polling(bot)
 

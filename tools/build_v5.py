@@ -21,6 +21,7 @@ import base64
 import datetime
 import hashlib
 import sys
+import tempfile
 import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -177,15 +178,16 @@ def quest_start_text() -> str:
     """Скрытый START.txt внутри .siq — первый (расширяемый) шаг квеста.
 
     Два слоя Base64:
-      • первый — приветствие + намёк «ищи ключ ниже»,
-      • второй — сам код (entry_code в stages.yaml).
-    Игрок должен ввести код боту через /start ARGUS1001.
+      • первый — адрес бота и инструкция начать пролог обычным /start;
+      • второй — код активации (entry_code в stages.yaml), который попросит Аргус.
     """
     greet = ("ПОЗДРАВЛЯЮ. ТЫ НАШЁЛ ВХОД В ИНДИВИДУАЛЬНЫЙ КВЕСТ — "
-             "КАЖДЫЙ ИДЁТ САМ ЗА СЕБЯ. СЛЕДУЮЩИЙ СЛОЙ СПРЯТАН ГЛУБЖЕ: "
-             "В КАРТИНКАХ, В ОТВЕТАХ, В РЕАЛЬНЫХ ТОЧКАХ. "
-             "ВТОРОЙ БЛОК — ЭТО КЛЮЧ В БОТ. ХОРОШО СПРЯТАННОЕ — "
-             "ХОРОШО НАЙДЁННОЕ.")
+             "КАЖДЫЙ ИДЁТ САМ ЗА СЕБЯ. ОТКРОЙ TELEGRAM-БОТА "
+             "@Zengame_checker_bot И НАЖМИ ОБЫЧНЫЙ START. "
+             "НЕ ВВОДИ КЛЮЧ СРАЗУ: СОХРАНИ ЕГО. "
+             "ПОСЛЕ ПРОЛОГА ARGVS ПОТРЕБУЕТ КЛЮЧ АКТИВАЦИИ, "
+             "ЧТОБЫ ПРОВЕРИТЬ, ЧТО ВЫ НЕ БЕЗНАДЁЖНЫ. "
+             "ХОРОШО СПРЯТАННОЕ — ХОРОШО НАЙДЁННОЕ.")
     code = "ARGUS1001"
     a = base64.b64encode(greet.encode("utf-8")).decode("ascii")
     b = base64.b64encode(code.encode("utf-8")).decode("ascii")
@@ -203,12 +205,41 @@ def quest_start_text() -> str:
         "\n"
         f"{a_lines}\n"
         "\n"
-        "   Второй блок — ключ в бот. Та же кодировка:\n"
+        "   Второй блок — ключ активации Аргуса. Та же кодировка. Сохрани его:\n"
         "\n"
         f"{b_lines}\n"
         "\n"
         "   — хороший поиск вознаграждается. Продолжение следует.\n"
     )
+
+
+def update_start_text_in_package(package_path: Path = OUT_SIQ) -> None:
+    """Обновляет только START.txt, не пересобирая раунды и медиа пакета."""
+    with zipfile.ZipFile(package_path, "r") as source:
+        entries = [(info, source.read(info.filename)) for info in source.infolist()]
+
+    with tempfile.NamedTemporaryFile(
+        dir=package_path.parent,
+        prefix=package_path.stem + "-start-",
+        suffix=".tmp",
+        delete=False,
+    ) as temporary:
+        temporary_path = Path(temporary.name)
+
+    try:
+        with zipfile.ZipFile(temporary_path, "w") as target:
+            found = False
+            for info, data in entries:
+                if info.filename == "START.txt":
+                    data = quest_start_text().encode("utf-8")
+                    found = True
+                target.writestr(info, data)
+            if not found:
+                target.writestr("START.txt", quest_start_text())
+        temporary_path.replace(package_path)
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
 
 
 def main() -> int:
