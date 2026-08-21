@@ -2,5 +2,5 @@
 
 Пересборка: `python3 tools/make_quest_assets.py`
 
-Все файлы принадлежат узлам N1–N6 (см. `doc/QUEST_WALKTHROUGH.md`).
-LSB живёт только в PNG (`n1_layers.png`) — бот шлёт его как document, не как photo.
+Все файлы — узлы N1–N6. Разгадка: `doc/QUEST_WALKTHROUGH.md`.
+`n1_card.jpg` бот шлёт как document (EXIF + хвост JPEG).

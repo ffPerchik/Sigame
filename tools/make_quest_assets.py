@@ -2,17 +2,16 @@
 """Генератор медиа для ARG «Аргус-1001» (6 независимых узлов, много слоёв)."""
 from __future__ import annotations
 
-import struct
 import subprocess
 import wave
 from pathlib import Path
 
 import numpy as np
 import piexif
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFont
 
 from quest_crypto import (
-    RU, a1z26_encode, atbash, only_ru, pigpen_cell, polybius_coord,
+    RU, a1z26_encode, atbash, only_ru, pigpen_cell,
     rail_fence_enc, vigenere,
 )
 
@@ -143,38 +142,6 @@ def ffmpeg() -> str | None:
 
 
 # ===================================================================== N1
-def lsb_embed(img: Image.Image, message: str, channel: int = 2) -> Image.Image:
-    arr = np.array(img.convert("RGB"))
-    data = message.encode("utf-8") + b"\x00"
-    bits = []
-    for b in data:
-        for k in range(8):
-            bits.append((b >> (7 - k)) & 1)
-    h, w, _ = arr.shape
-    if len(bits) > h * w:
-        raise ValueError("сообщение не влезает в LSB")
-    flat = arr[:, :, channel].reshape(-1)
-    for i, bit in enumerate(bits):
-        flat[i] = (int(flat[i]) & 0xFE) | bit
-    arr[:, :, channel] = flat.reshape(h, w)
-    return Image.fromarray(arr)
-
-
-def lsb_extract(img: Image.Image, channel: int = 2, n: int = 200) -> str:
-    arr = np.array(img.convert("RGB"))
-    flat = arr[:, :, channel].reshape(-1)
-    bits = [int(flat[i]) & 1 for i in range(n * 8)]
-    raw = bytearray()
-    for i in range(0, len(bits), 8):
-        b = 0
-        for k in range(8):
-            b = (b << 1) | bits[i + k]
-        if b == 0:
-            break
-        raw.append(b)
-    return raw.decode("utf-8", errors="replace")
-
-
 def draw_pigpen(draw: ImageDraw.ImageDraw, xy: tuple[int, int], ch: str, scale=18):
     idx = RU.index(ch)
     kind, dotted, pos = pigpen_cell(idx)
@@ -685,7 +652,7 @@ def write_readme():
 Пересборка: `python3 tools/make_quest_assets.py`
 
 Все файлы принадлежат узлам N1–N6 (см. `doc/QUEST_WALKTHROUGH.md`).
-LSB живёт только в PNG (`n1_layers.png`) — бот шлёт его как document, не как photo.
+`n1_card.jpg` шлётся как document, иначе Telegram сожмёт EXIF и хвост JPEG.
 """,
         encoding="utf-8",
     )

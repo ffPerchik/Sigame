@@ -103,10 +103,3 @@ def pigpen_cell(idx: int) -> tuple[str, bool]:
     dotted = group % 2 == 1
     kind = "box" if group in (0, 1) else "x"
     return kind, dotted, pos
-
-
-def polybius_coord(ch: str) -> str:
-    """6×6, строки/столбцы 1–6."""
-    i = RU.index(ch)
-    r, c = divmod(i, 6)
-    return f"{r + 1}{c + 1}"
