@@ -115,7 +115,6 @@ async def _send_typewriter_text(uid: int, text: str):
         text,
         lambda partial: bot.send_message(uid, partial),
         edit,
-        chunk_size=cfg.ZHENYA_TYPEWRITER_CHUNK,
         interval=cfg.ZHENYA_TYPEWRITER_INTERVAL,
     )
 
@@ -128,7 +127,6 @@ async def _send_typewriter_media(sender, uid: int, path: Path, text: str):
         text,
         lambda partial: sender(uid, FSInputFile(path), caption=partial),
         edit,
-        chunk_size=cfg.ZHENYA_TYPEWRITER_CHUNK,
         interval=cfg.ZHENYA_TYPEWRITER_INTERVAL,
     )
 

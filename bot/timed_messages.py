@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-import random
+import re
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -54,31 +54,18 @@ async def send_typewriter(
     send: Callable[[str], Awaitable[object]],
     edit: Callable[[object, str], Awaitable[object]],
     *,
-    chunk_size: int = 3,
     interval: float = 0.15,
     sleep: Callable[[float], Awaitable[object]] = asyncio.sleep,
-    randint: Callable[[int, int], int] = random.randint,
 ) -> object | None:
-    """Допечатывает сообщение случайными порциями от 1 до `chunk_size` символов."""
+    """Отправляет первое слово и затем добавляет по одному слову за правку."""
     text = text.strip()
     if not text:
         return None
 
-    chunk_size = max(1, int(chunk_size))
     interval = max(0.0, float(interval))
-
-    # Telegram отбрасывает пробелы и переводы строк в конце сообщения. Поэтому
-    # промежуточный вариант, заканчивающийся пробелом, был бы идентичен текущему
-    # и вызвал бы Bad Request: message is not modified. Добавляем такой пробел
-    # вместе со следующим видимым символом.
-    ends: list[int] = []
-    end = 0
-    while end < len(text):
-        step = max(1, min(chunk_size, int(randint(1, chunk_size))))
-        end = min(len(text), end + step)
-        if end == len(text) or not text[end - 1].isspace():
-            ends.append(end)
-    versions = [text[:end] for end in ends]
+    # Конец версии всегда совпадает с концом слова. Поэтому Telegram не обрежет
+    # хвостовой пробел и не ответит ошибкой «message is not modified».
+    versions = [text[:match.end()] for match in re.finditer(r"\S+", text)]
 
     message = await send(versions[0])
     for partial in versions[1:]:

@@ -60,9 +60,8 @@ class TimedMessagesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sent[2][0], datetime(2026, 8, 22, 12, 0, 3, 500000, tzinfo=timezone.utc))
         self.assertEqual(sent[2][1], "[12:00:03.500] ARGVS-1001 // TWO")
 
-    async def test_typewriter_uses_random_chunks_from_one_to_three(self):
+    async def test_typewriter_adds_one_word_at_a_time(self):
         versions = []
-        steps = iter([1, 2, 3, 1])
 
         async def send(partial):
             versions.append(partial)
@@ -74,14 +73,8 @@ class TimedMessagesTests(unittest.IsolatedAsyncioTestCase):
         async def sleep(_delay):
             pass
 
-        await send_typewriter(
-            "Женечка",
-            send,
-            edit,
-            sleep=sleep,
-            randint=lambda minimum, maximum: next(steps),
-        )
-        self.assertEqual(versions, ["Ж", "Жен", "Женечк", "Женечка"])
+        await send_typewriter("Привет, это Женя!", send, edit, sleep=sleep)
+        self.assertEqual(versions, ["Привет,", "Привет, это", "Привет, это Женя!"])
 
     async def test_typewriter_does_not_send_whitespace_only_updates(self):
         versions = []
@@ -96,7 +89,7 @@ class TimedMessagesTests(unittest.IsolatedAsyncioTestCase):
         async def sleep(_delay):
             pass
 
-        await send_typewriter("А Б\nВ", send, edit, chunk_size=1, sleep=sleep)
+        await send_typewriter("А Б\nВ", send, edit, sleep=sleep)
         self.assertEqual(versions, ["А", "А Б", "А Б\nВ"])
 
     async def test_typewriter_edits_one_message_without_trailing_delay(self):
@@ -115,22 +108,20 @@ class TimedMessagesTests(unittest.IsolatedAsyncioTestCase):
             events.append(("sleep", delay))
 
         result = await send_typewriter(
-            "ABCDEFGH",
+            "ONE TWO THREE",
             send,
             edit,
-            chunk_size=3,
             interval=0.2,
             sleep=sleep,
-            randint=lambda _minimum, maximum: maximum,
         )
 
         self.assertIs(result, message)
         self.assertEqual(events, [
-            ("send", "ABC"),
+            ("send", "ONE"),
             ("sleep", 0.2),
-            ("edit", "ABCDEF"),
+            ("edit", "ONE TWO"),
             ("sleep", 0.2),
-            ("edit", "ABCDEFGH"),
+            ("edit", "ONE TWO THREE"),
         ])
 
     async def test_activity_wraps_delay_and_progressive_send(self):
