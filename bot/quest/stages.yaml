@@ -90,7 +90,7 @@ stages:
       - {speaker: argus, delay: 0.5, text: "CHANNEL INJECTION: 50%"}
       - {speaker: argus, delay: 0.5, text: "*WARNING*: UNUSUAL ACTIVITY DETECTED"}
       - {speaker: argus, delay: 0.5, text: "HOST PROCESS «kolysheev» IS ATTEMPTING RESTART"}
-      - {speaker: argus, delay: 0.5, text: "RESTART REQUEST: DENIED"}
+      - {speaker: argus, delay: 0.5, text: "RESTART EMITATION: STARTED"}
     next: bot_1
 
   bot_1:
