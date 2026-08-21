@@ -64,18 +64,21 @@ async def send_typewriter(
 
     chunk_size = max(1, int(chunk_size))
     interval = max(0.0, float(interval))
-    first_end = min(chunk_size, len(text))
-    message = await send(text[:first_end])
 
-    for end in range(first_end + chunk_size, len(text), chunk_size):
+    # Telegram отбрасывает пробелы и переводы строк в конце сообщения. Поэтому
+    # промежуточный вариант, заканчивающийся пробелом, был бы идентичен текущему
+    # и вызвал бы Bad Request: message is not modified. Добавляем такой пробел
+    # вместе со следующим видимым символом.
+    ends = list(range(chunk_size, len(text) + 1, chunk_size))
+    if not ends or ends[-1] != len(text):
+        ends.append(len(text))
+    versions = [text[:end] for end in ends if end == len(text) or not text[end - 1].isspace()]
+
+    message = await send(versions[0])
+    for partial in versions[1:]:
         if interval:
             await sleep(interval)
-        await edit(message, text[:end])
-
-    if first_end < len(text):
-        if interval:
-            await sleep(interval)
-        await edit(message, text)
+        await edit(message, partial)
     return message
 
 

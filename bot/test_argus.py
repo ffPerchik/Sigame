@@ -76,6 +76,22 @@ class TimedMessagesTests(unittest.IsolatedAsyncioTestCase):
         await send_typewriter("Женя", send, edit, sleep=sleep)
         self.assertEqual(versions, ["Ж", "Же", "Жен", "Женя"])
 
+    async def test_typewriter_does_not_send_whitespace_only_updates(self):
+        versions = []
+
+        async def send(partial):
+            versions.append(partial)
+            return "message"
+
+        async def edit(_message, partial):
+            versions.append(partial)
+
+        async def sleep(_delay):
+            pass
+
+        await send_typewriter("А Б\nВ", send, edit, sleep=sleep)
+        self.assertEqual(versions, ["А", "А Б", "А Б\nВ"])
+
     async def test_typewriter_edits_one_message_without_trailing_delay(self):
         events = []
         message = object()

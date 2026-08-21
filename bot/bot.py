@@ -10,7 +10,7 @@ from pathlib import Path
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
-from aiogram.exceptions import TelegramRetryAfter
+from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
 from aiogram.filters import BaseFilter, Command, CommandStart
 from aiogram.types import (
     CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message,
@@ -95,12 +95,16 @@ def _message_activity(uid: int):
 
 
 async def _retry_telegram_edit(operation):
-    """Соблюдает указанную Telegram паузу, если частые правки упёрлись в лимит."""
+    """Обрабатывает лимит правок и безвредный ответ «message is not modified»."""
     while True:
         try:
             return await operation()
         except TelegramRetryAfter as error:
             await asyncio.sleep(max(0.1, float(error.retry_after)))
+        except TelegramBadRequest as error:
+            if "message is not modified" in str(error).lower():
+                return None
+            raise
 
 
 async def _send_typewriter_text(uid: int, text: str):
