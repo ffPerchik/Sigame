@@ -18,13 +18,13 @@ try:  # `python -m bot.bot`
     from . import config as cfg
     from . import db, quest
     from . import texts as T
-    from .argus import send_lines as send_argus_lines
+    from .timed_messages import send_messages as send_timed_messages, wait_before
 except ImportError:  # `python bot/bot.py` или запуск из папки bot
     import config as cfg
     import db
     import quest
     import texts as T
-    from argus import send_lines as send_argus_lines
+    from timed_messages import send_messages as send_timed_messages, wait_before
 
 BASE = Path(__file__).resolve().parent
 INTRO_STAGE = quest.first_stage()
@@ -95,22 +95,20 @@ async def send_stage(uid: int, stage_id: str) -> None:
     if not st:
         await bot.send_message(uid, T.STAGE_MISSING.format(stage=stage_id))
         return
-    before_text = (st.get("before_text") or "").strip()
-    if before_text:
-        await bot.send_message(uid, before_text)
-
-    argus_lines = st.get("argus") or []
-    if isinstance(argus_lines, str):
-        argus_lines = [argus_lines]
-    if argus_lines:
-        await send_argus_lines(
-            argus_lines,
+    messages = st.get("messages") or []
+    if messages:
+        await send_timed_messages(
+            messages,
             lambda line: bot.send_message(uid, line),
-            delay=st.get("argus_delay", 0.5),
         )
 
     text = (st.get("text") or "").strip()
     media_dir = BASE / "quest" / "images"
+    has_media = any(st.get(field) for field in ("image", "audio", "video", "document"))
+    if text or has_media:
+        # `delay` относится только к следующему обычному сообщению/медиа стадии
+        # и всегда отрабатывает ДО него, никогда после.
+        await wait_before(st.get("delay", 0.0))
     for field, sender, kind_label in (
         ("image",    bot.send_photo,    "photo"),
         ("audio",    bot.send_audio,    "audio"),
@@ -227,10 +225,9 @@ async def _try_answer(uid: int, message: Message, text: str) -> None:
     else:
         wrong_argus = st.get("wrong_argus")
         if wrong_argus:
-            await send_argus_lines(
-                [wrong_argus],
+            await send_timed_messages(
+                [{"speaker": "argus", "text": wrong_argus, "delay": 0}],
                 lambda line: message.answer(line),
-                delay=0,
             )
         else:
             await message.answer(st.get("wrong_text", T.WRONG))

@@ -2,8 +2,9 @@
 # Уличная точка: у стадии qr: true и accept: ["КОД"], затем python bot/make_qr.py
 entry_code: "ARGUS1001"
 
-# Поле `argus:` — реплики ARGVS-1001. Бот добавляет к каждой реальное время,
-# отправляет отдельным Telegram-сообщением и выдерживает `argus_delay` секунд.
+# Поле `messages:` — последовательность сообщений. У каждого `delay` означает
+# паузу ПЕРЕД именно этим сообщением. `speaker: argus` добавляет реальное время
+# и префикс ARGVS-1001; обычные сообщения используют тот же механизм задержек.
 
 welcome:
   text: |
@@ -41,12 +42,11 @@ stages:
 
   a_1:
     mode: info
-    argus_delay: 0.5
-    argus:
-      - "NETWORK INTERFACE: ACTIVE"
-      - "ESTABLISHING SECURE HANDSHAKE…"
-      - "HANDSHAKE ACCEPTED"
-      - "VOICE CHANNEL TEST: …ТЫ СЛЫШИШЬ НАС?"
+    messages:
+      - {speaker: argus, delay: 0.5, text: "NETWORK INTERFACE: ACTIVE"}
+      - {speaker: argus, delay: 0.5, text: "ESTABLISHING SECURE HANDSHAKE…"}
+      - {speaker: argus, delay: 0.5, text: "HANDSHAKE ACCEPTED"}
+      - {speaker: argus, delay: 0.5, text: "VOICE CHANNEL TEST: …ТЫ СЛЫШИШЬ НАС?"}
     next: z_2
 
   z_2:
@@ -64,16 +64,15 @@ stages:
 
   a_2:
     mode: info
-    argus_delay: 0.5
-    argus:
-      - "HANDSHAKE PROGRESS: 25%"
-      - "ROUTING TRAFFIC THROUGH RELAY NODES"
-      - "TARGET GATEWAY DETECTED"
-      - "AUTHORIZATION STATUS: UNKNOWN"
-      - "ACCESS REQUEST PENDING…"
-      - "SESSION TOKEN ACQUIRED"
-      - "ENCRYPTED CHANNEL: ONLINE"
-      - "НЕ ОТВЕЧАЙ ЖЕНЕ. ОН БОЛЬШЕ НЕ КОНТРОЛИРУЕТ МАРШРУТ."
+    messages:
+      - {speaker: argus, delay: 0.5, text: "HANDSHAKE PROGRESS: 25%"}
+      - {speaker: argus, delay: 0.5, text: "ROUTING TRAFFIC THROUGH RELAY NODES"}
+      - {speaker: argus, delay: 0.5, text: "TARGET GATEWAY DETECTED"}
+      - {speaker: argus, delay: 0.5, text: "AUTHORIZATION STATUS: UNKNOWN"}
+      - {speaker: argus, delay: 0.5, text: "ACCESS REQUEST PENDING…"}
+      - {speaker: argus, delay: 0.5, text: "SESSION TOKEN ACQUIRED"}
+      - {speaker: argus, delay: 0.5, text: "ENCRYPTED CHANNEL: ONLINE"}
+      - {speaker: argus, delay: 0.5, text: "НЕ ОТВЕЧАЙ ЖЕНЕ. ОН БОЛЬШЕ НЕ КОНТРОЛИРУЕТ МАРШРУТ."}
     next: z_3
 
   z_3:
@@ -98,15 +97,14 @@ stages:
 
   a_3:
     mode: info
-    argus_delay: 0.5
-    argus:
-      - "CHANNEL INJECTION: 50%"
-      - "INTERNAL NETWORK MAP LOADED"
-      - "WARNING: UNUSUAL ACTIVITY DETECTED"
-      - "COUNTERMEASURES INITIALIZING"
-      - "HOST PROCESS «ЖЕНЯ» IS ATTEMPTING RESTART"
-      - "RESTART REQUEST: DENIED"
-      - "ПЕРЕЗАПУСК НИЧЕГО НЕ ИЗМЕНИТ. МЫ УЖЕ ВНУТРИ."
+    messages:
+      - {speaker: argus, delay: 0.5, text: "CHANNEL INJECTION: 50%"}
+      - {speaker: argus, delay: 0.5, text: "INTERNAL NETWORK MAP LOADED"}
+      - {speaker: argus, delay: 0.5, text: "WARNING: UNUSUAL ACTIVITY DETECTED"}
+      - {speaker: argus, delay: 0.5, text: "COUNTERMEASURES INITIALIZING"}
+      - {speaker: argus, delay: 0.5, text: "HOST PROCESS «ЖЕНЯ» IS ATTEMPTING RESTART"}
+      - {speaker: argus, delay: 0.5, text: "RESTART REQUEST: DENIED"}
+      - {speaker: argus, delay: 0.5, text: "ПЕРЕЗАПУСК НИЧЕГО НЕ ИЗМЕНИТ. МЫ УЖЕ ВНУТРИ."}
     next: z_fix50
 
   z_fix50:
@@ -129,14 +127,13 @@ stages:
 
   z_p75:
     mode: info
-    argus_delay: 0.5
-    argus:
-      - "CHANNEL OVERWRITE: 75%"
-      - "RE-ROUTING CONNECTION…"
-      - "CONNECTION STABILIZED"
-      - "MIRROR DATA STREAM: 18% COMPLETE"
-      - "MIRROR DATA STREAM: 47% COMPLETE"
-      - "ЖЕНЯ. ОТОЙДИ ОТ КАНАЛА."
+    messages:
+      - {speaker: argus, delay: 0.5, text: "CHANNEL OVERWRITE: 75%"}
+      - {speaker: argus, delay: 0.5, text: "RE-ROUTING CONNECTION…"}
+      - {speaker: argus, delay: 0.5, text: "CONNECTION STABILIZED"}
+      - {speaker: argus, delay: 0.5, text: "MIRROR DATA STREAM: 18% COMPLETE"}
+      - {speaker: argus, delay: 0.5, text: "MIRROR DATA STREAM: 47% COMPLETE"}
+      - {speaker: argus, delay: 0.5, text: "ЖЕНЯ. ОТОЙДИ ОТ КАНАЛА."}
     next: z_fix75
 
   z_fix75:
@@ -160,32 +157,31 @@ stages:
 
   z_p100:
     mode: info
-    argus_delay: 0.5
-    argus:
-      - "MIRROR DATA STREAM: 83% COMPLETE"
-      - "TRANSFER COMPLETE"
-      - "CHANNEL OVERWRITE: 100%"
-      - "ПЕРЕДАЧА ПЕРЕХВАЧЕНА"
-      - "ИГРОК, НЕ ЗАКРЫВАЙ СОЕДИНЕНИЕ. ОСТАЛСЯ ОДИН ШАГ."
+    messages:
+      - {speaker: argus, delay: 0.5, text: "MIRROR DATA STREAM: 83% COMPLETE"}
+      - {speaker: argus, delay: 0.5, text: "TRANSFER COMPLETE"}
+      - {speaker: argus, delay: 0.5, text: "CHANNEL OVERWRITE: 100%"}
+      - {speaker: argus, delay: 0.5, text: "ПЕРЕДАЧА ПЕРЕХВАЧЕНА"}
+      - {speaker: argus, delay: 0.5, text: "ИГРОК, НЕ ЗАКРЫВАЙ СОЕДИНЕНИЕ. ОСТАЛСЯ ОДИН ШАГ."}
     next: z_hack
 
   z_hack:
     mode: info
-    before_text: |
-      Женя: нет нет нет подож—
-    argus_delay: 0.5
-    argus:
-      - "TERMINATING HOST SESSION…"
-      - "TRACE STATUS: CLEAR"
-      - "CONNECTION OWNER: ARGVS-1001"
-      - "ЖЕНЯ БОЛЬШЕ НЕ ВЕДЁТ ЭТУ ЛИНИЮ"
-    text: |
-      ┌────────────────────────────────────────────────────────────────┐
-      │  ARGVS-1001 · СЕАНС ПЕРЕХВАЧЕН                                │
-      └────────────────────────────────────────────────────────────────┘
+    messages:
+      - text: "Женя: нет нет нет подож—"
+        delay: 0.5
+      - {speaker: argus, delay: 0.5, text: "TERMINATING HOST SESSION…"}
+      - {speaker: argus, delay: 0.5, text: "TRACE STATUS: CLEAR"}
+      - {speaker: argus, delay: 0.5, text: "CONNECTION OWNER: ARGVS-1001"}
+      - {speaker: argus, delay: 0.5, text: "ЖЕНЯ БОЛЬШЕ НЕ ВЕДЁТ ЭТУ ЛИНИЮ"}
+      - delay: 0.5
+        text: |
+          ┌────────────────────────────────────────────────────────────────┐
+          │  ARGVS-1001 · СЕАНС ПЕРЕХВАЧЕН                                │
+          └────────────────────────────────────────────────────────────────┘
 
-      Шесть узлов. В каждом смотри глубже, чем кажется.
-      Один слой — мало. Порядок любой.
+          Шесть узлов. В каждом смотри глубже, чем кажется.
+          Один слой — мало. Порядок любой.
     next: quest_gate
 
   quest_gate:
@@ -193,25 +189,23 @@ stages:
     accept_entry_code: true
     correct_text: ""
     wrong_argus: "КЛЮЧ ОТКЛОНЁН. ВЕРНИСЬ К КОНТЕЙНЕРУ SIGAME И ИЩИ ВНИМАТЕЛЬНЕЕ."
-    argus_delay: 0.5
-    argus:
-      - "ПРОЛОГ ЗАВЕРШЁН"
-      - "ОСНОВНОЙ ПРОТОКОЛ: LOCKED"
-      - "ШЕСТЬ УЗЛОВ ПОДГОТОВЛЕНЫ"
-      - "ДОПУСК ТРЕБУЕТ КЛЮЧ АКТИВАЦИИ ИЗ КОНТЕЙНЕРА SIGAME"
-      - "ВВЕДИ КЛЮЧ. ДОКАЖИ, ЧТО ВЫ НЕ БЕЗНАДЁЖНЫ."
+    messages:
+      - {speaker: argus, delay: 0.5, text: "ПРОЛОГ ЗАВЕРШЁН"}
+      - {speaker: argus, delay: 0.5, text: "ОСНОВНОЙ ПРОТОКОЛ: LOCKED"}
+      - {speaker: argus, delay: 0.5, text: "ШЕСТЬ УЗЛОВ ПОДГОТОВЛЕНЫ"}
+      - {speaker: argus, delay: 0.5, text: "ДОПУСК ТРЕБУЕТ КЛЮЧ АКТИВАЦИИ ИЗ КОНТЕЙНЕРА SIGAME"}
+      - {speaker: argus, delay: 0.5, text: "ВВЕДИ КЛЮЧ. ДОКАЖИ, ЧТО ВЫ НЕ БЕЗНАДЁЖНЫ."}
     hint: |
       Ключ был спрятан внутри zengame.siq рядом с посланием, которое привело тебя в бот.
     next: quest_unlocked
 
   quest_unlocked:
     mode: info
-    argus_delay: 0.5
-    argus:
-      - "ACTIVATION KEY ACCEPTED"
-      - "ПРОВЕРКА ЗАВЕРШЕНА: ВЫ НЕ БЕЗНАДЁЖНЫ"
-      - "ОСНОВНОЙ ПРОТОКОЛ: UNLOCKED"
-      - "ДОСТУП К ШЕСТИ УЗЛАМ РАЗРЕШЁН"
+    messages:
+      - {speaker: argus, delay: 0.5, text: "ACTIVATION KEY ACCEPTED"}
+      - {speaker: argus, delay: 0.5, text: "ПРОВЕРКА ЗАВЕРШЕНА: ВЫ НЕ БЕЗНАДЁЖНЫ"}
+      - {speaker: argus, delay: 0.5, text: "ОСНОВНОЙ ПРОТОКОЛ: UNLOCKED"}
+      - {speaker: argus, delay: 0.5, text: "ДОСТУП К ШЕСТИ УЗЛАМ РАЗРЕШЁН"}
     next: hub
 
   # ============================== N1 ==============================
