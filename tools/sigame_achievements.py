@@ -56,6 +56,7 @@ class Outcome:
     sequence: int
     player: str
     delta: int
+    kind: str = "answer"  # answer | manual
     answer: str | None = None
     round_name: str | None = None
     theme: str | None = None
@@ -77,7 +78,12 @@ class PlayerMetrics:
     max_right_streak: int = 0
     max_wrong_streak: int = 0
     returned_to_zero: bool = False
+    manual_change_count: int = 0
+    manual_total: int = 0
     answers: list[str] = field(default_factory=list)
+    net_by_theme: dict[str, int] = field(default_factory=dict)
+    positive_by_theme: dict[str, int] = field(default_factory=dict)
+    net_by_round: dict[str, int] = field(default_factory=dict)
     right_by_theme: dict[str, int] = field(default_factory=dict)
     wrong_by_theme: dict[str, int] = field(default_factory=dict)
     right_by_round: dict[str, int] = field(default_factory=dict)
@@ -250,22 +256,43 @@ def _calculate_metrics(players: dict[str, PlayerMetrics], outcomes: list[Outcome
         player.min_score = min(player.min_score, player.final_score)
         player.max_score = max(player.max_score, player.final_score)
 
+        if outcome.delta > 0:
+            player.max_gain = max(player.max_gain, outcome.delta)
+        elif outcome.delta < 0:
+            player.max_loss = max(player.max_loss, abs(outcome.delta))
+
         if player.final_score != 0:
             was_nonzero[outcome.player] = True
         elif was_nonzero[outcome.player]:
             player.returned_to_zero = True
 
+        # Любые изменения счёта, включая ручные, влияют на результат темы и раунда.
+        if outcome.theme and outcome.delta != 0:
+            player.net_by_theme[outcome.theme] = player.net_by_theme.get(outcome.theme, 0) + outcome.delta
+            if outcome.delta > 0:
+                player.positive_by_theme[outcome.theme] = (
+                    player.positive_by_theme.get(outcome.theme, 0) + outcome.delta
+                )
+        if outcome.round_name and outcome.delta != 0:
+            player.net_by_round[outcome.round_name] = (
+                player.net_by_round.get(outcome.round_name, 0) + outcome.delta
+            )
+
+        # Ручная корректировка учитывается в счёте, но не выдаётся за верный или
+        # неверный ответ и не меняет серии ответов.
+        if outcome.kind == "manual":
+            player.manual_change_count += 1
+            player.manual_total += outcome.delta
+            continue
+
         if outcome.delta > 0:
             player.right_count += 1
             player.right_total += outcome.delta
-            player.max_gain = max(player.max_gain, outcome.delta)
             current_right_streak[outcome.player] += 1
             current_wrong_streak[outcome.player] = 0
         elif outcome.delta < 0:
-            loss = abs(outcome.delta)
             player.wrong_count += 1
-            player.wrong_total += loss
-            player.max_loss = max(player.max_loss, loss)
+            player.wrong_total += abs(outcome.delta)
             current_wrong_streak[outcome.player] += 1
             current_right_streak[outcome.player] = 0
 
@@ -322,6 +349,19 @@ STAT_LINE_RE = re.compile(
     re.IGNORECASE,
 )
 
+MANUAL_SCORE_PATTERNS = (
+    re.compile(
+        r"^.+?\s+изменил(?:\(а\)|а)?\s+сумму\s+на\s+сч[её]те\s+"
+        r"(?P<player>.+?)\s+с\s+(?P<old>-?\d+)\s+на\s+(?P<new>-?\d+)\s*$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"^.+?\s+changed\s+(?P<player>.+?)\s+score\s+from\s+"
+        r"(?P<old>-?\d+)\s+to\s+(?P<new>-?\d+)\s*$",
+        re.IGNORECASE,
+    ),
+)
+
 
 def parse_text_log(
     path: Path,
@@ -376,6 +416,12 @@ def parse_text_log(
         )
         for name in players
     }
+    player_aliases: dict[str, str] = {}
+    for name in players:
+        player_aliases[name.casefold()] = name
+        if name.startswith("Ⓢ"):
+            player_aliases[name[1:].casefold()] = name
+
     current_question: QuestionContext | None = None
     tracked_question_outcomes = 0
     for line_index, line in enumerate(lines):
@@ -393,6 +439,29 @@ def parse_text_log(
                     context = question_index.get((theme_name, price))
                     if context:
                         current_question = context
+
+        manual_match = next(
+            (match for pattern in MANUAL_SCORE_PATTERNS if (match := pattern.match(line))),
+            None,
+        )
+        if manual_match:
+            player_name = player_aliases.get(manual_match.group("player").strip().casefold())
+            if player_name:
+                sequence += 1
+                raw_outcomes.append(
+                    Outcome(
+                        sequence,
+                        player_name,
+                        int(manual_match.group("new")) - int(manual_match.group("old")),
+                        kind="manual",
+                        round_name=current_question.round_name if current_question else None,
+                        theme=current_question.theme if current_question else None,
+                        question_price=current_question.price if current_question else None,
+                    )
+                )
+                if current_question:
+                    tracked_question_outcomes += 1
+                continue
 
         for name, pattern in outcome_patterns.items():
             match = pattern.match(line)
@@ -508,16 +577,16 @@ def calculate_awards(game: GameData) -> dict[str, list[Award]]:
     give(
         _leaders(
             players,
-            lambda p: len(p.right_by_theme),
-            eligible=lambda p: bool(p.right_by_theme),
+            lambda p: len(p.positive_by_theme),
+            eligible=lambda p: bool(p.positive_by_theme),
         ),
         "polymath",
         "Широкий кругозор",
         2,
         lambda p: (
-            "верные ответы в 1 теме"
-            if len(p.right_by_theme) == 1
-            else f"верные ответы в {len(p.right_by_theme)} разных темах"
+            "положительный результат в 1 теме"
+            if len(p.positive_by_theme) == 1
+            else f"положительный результат в {len(p.positive_by_theme)} разных темах"
         ),
     )
     give(
@@ -551,13 +620,13 @@ def calculate_awards(game: GameData) -> dict[str, list[Award]]:
         give(
             _leaders(
                 players,
-                lambda p, name=round_name: p.right_by_round.get(name, 0),
-                eligible=lambda p, name=round_name: p.right_by_round.get(name, 0) > 0,
+                lambda p, name=round_name: p.net_by_round.get(name, 0),
+                eligible=lambda p, name=round_name: p.net_by_round.get(name, 0) > 0,
             ),
             f"round_king_{round_index}",
             f"Король раунда «{round_name}»",
             1,
-            lambda p, name=round_name: f"верных ответов в раунде: {p.right_by_round.get(name, 0)}",
+            lambda p, name=round_name: f"результат раунда: {p.net_by_round.get(name, 0)} очков",
         )
 
     # Рофельные и утешительные — по одной подсказке.
@@ -604,15 +673,15 @@ def calculate_awards(game: GameData) -> dict[str, list[Award]]:
     give(
         _leaders(
             players,
-            lambda p: max(p.right_by_theme.values(), default=0),
-            eligible=lambda p: bool(p.right_by_theme),
+            lambda p: max(p.net_by_theme.values(), default=0),
+            eligible=lambda p: any(value > 0 for value in p.net_by_theme.values()),
         ),
         "theme_specialist",
         "Тематический маньяк",
         1,
         lambda p: (
-            f"лучший результат в одной теме: {max(p.right_by_theme.values())} "
-            f"({', '.join(name for name, count in p.right_by_theme.items() if count == max(p.right_by_theme.values()))})"
+            f"лучший результат в одной теме: {max(p.net_by_theme.values())} очков "
+            f"({', '.join(name for name, value in p.net_by_theme.items() if value == max(p.net_by_theme.values()))})"
         ),
     )
     give(
@@ -644,7 +713,10 @@ def calculate_awards(game: GameData) -> dict[str, list[Award]]:
         lambda p: f"один скачок счёта: {max(p.max_gain, p.max_loss)}",
     )
 
-    last_right = next((outcome for outcome in reversed(game.outcomes) if outcome.delta > 0), None)
+    last_right = next(
+        (outcome for outcome in reversed(game.outcomes) if outcome.kind == "answer" and outcome.delta > 0),
+        None,
+    )
     if last_right:
         give(
             [game.players[last_right.player]],

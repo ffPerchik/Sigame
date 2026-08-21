@@ -49,6 +49,7 @@ class SIGameAchievementsTests(unittest.TestCase):
     def test_sionline_text_log(self):
         content = """Theme A, 900
 Player A: +100
+Host изменил(а) сумму на счёте ⓈPlayer A с 100 на 450
 Theme B, 200
 Player B: -200
 Game statistics:
@@ -66,16 +67,22 @@ Player B: -500
         self.assertEqual(game.players["ⓈPlayer A"].right_count, 4)
         self.assertEqual(game.players["ⓈPlayer A"].final_score, 700)
         self.assertEqual(game.players["ⓈPlayer A"].right_by_theme, {"Theme A": 1})
-        self.assertEqual(len(game.outcomes), 2)
+        self.assertEqual(game.players["ⓈPlayer A"].manual_change_count, 1)
+        self.assertEqual(game.players["ⓈPlayer A"].manual_total, 350)
+        self.assertEqual(game.players["ⓈPlayer A"].net_by_round, {"Round 1": 450})
+        self.assertEqual(len(game.outcomes), 3)
         self.assertEqual(game.outcomes[0].player, "ⓈPlayer A")
         self.assertEqual(game.outcomes[0].question_price, 900)
+        self.assertEqual(game.outcomes[1].kind, "manual")
+        self.assertEqual(game.outcomes[1].delta, 350)
         self.assertEqual(game.players["Player B"].wrong_count, 5)
         self.assertFalse(game.warnings)
 
         awards = calculate_awards(game)
-        player_a_codes = {award.code for award in awards["ⓈPlayer A"]}
-        self.assertIn("big_game_hunter", player_a_codes)
-        self.assertIn("round_king_1", player_a_codes)
+        player_a_awards = {award.code: award for award in awards["ⓈPlayer A"]}
+        self.assertIn("big_game_hunter", player_a_awards)
+        self.assertIn("round_king_1", player_a_awards)
+        self.assertIn("450 очков", player_a_awards["round_king_1"].evidence)
 
     def test_main_only_creates_txt_report(self):
         content = """🎬 Кинчик, 100
