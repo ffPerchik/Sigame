@@ -615,7 +615,7 @@ def make_n6():
     d.text((36, 460), vig_c, fill=(240, 220, 120), font=font(56))
     d.text((36, 560), "Алфавит везде один: 32 буквы, без Ё.", fill=(110, 110, 120), font=font(20))
     # null cipher telestich as extra confirmation of ПОРТАЛ? skip to not leak
-    img.save(OUT / "n6_locks.png")
+    hack_glitch(img, seed=61).save(OUT / "n6_locks.png")
 
     print(f"  N6  A1Z26 of atbash(АТБАШ)={step1_c} → {nums}")
     print(f"  N6  atbash → {step1_plain}")
