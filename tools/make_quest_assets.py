@@ -44,13 +44,20 @@ def font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     )
 
 
-def hack_glitch(img: Image.Image, seed: int = 1,
-                keep_rect: tuple[int, int, int, int] | None = None) -> Image.Image:
-    """Лёгкий «взлом»: сканлайны, сдвиг канала, битые пиксели по краям.
+
+def hack_glitch(
+    img: Image.Image,
+    seed: int = 1,
+    keep_rect: tuple[int, int, int, int] | None = None,
+    power: float = 1.0,
+    scanlines: bool = False,
+) -> Image.Image:
+    """Лёгкий «взлом»: сдвиг канала, битые пиксели по краям.
     keep_rect = (x0,y0,x1,y1) не трогаем (текст на мониторе и т.п.)."""
     arr = np.array(img.convert("RGB"), dtype=np.int16)
     h, w = arr.shape[:2]
     rng = np.random.default_rng(seed)
+    power = max(0.0, power)
 
     def _ok(x, y):
         if keep_rect is None:
@@ -58,24 +65,72 @@ def hack_glitch(img: Image.Image, seed: int = 1,
         x0, y0, x1, y1 = keep_rect
         return not (x0 <= x <= x1 and y0 <= y <= y1)
 
-    arr[::7, :, :] = np.clip(arr[::7] + rng.integers(-10, 16), 0, 255)
-    sh = 2
-    arr[:, sh:, 0] = arr[:, :-sh, 0]
-    arr[:, :-sh, 2] = arr[:, sh:, 2]
-    for _ in range(max(18, w * h // 18000)):
+    if scanlines:
+        arr[::7, :, :] = np.clip(
+            arr[::7] + rng.integers(-10, 16) * power,
+            0,
+            255,
+        )
+
+    sh = max(1, int(round(2 * power)))
+    if sh < w:
+        arr[:, sh:, 0] = arr[:, :-sh, 0]
+        arr[:, :-sh, 2] = arr[:, sh:, 2]
+
+    for _ in range(max(1, int(max(18, w * h // 1000) * power))):
         x = int(rng.integers(0, max(w - 8, 1)))
         y = int(rng.integers(0, max(h - 6, 1)))
+
         if not _ok(x, y):
             continue
-        bw, bh = int(rng.integers(2, 9)), int(rng.integers(1, 5))
+
+        bw = max(1, int(rng.integers(2, 9) * power))
+        bh = max(1, int(rng.integers(1, 5) * power))
         val = int(rng.choice([0, 255, 30, 210, 0, 40]))
         ch = int(rng.integers(0, 3))
-        arr[y:y + bh, x:x + bw, ch] = val
-    # блик в углу
-    cx, cy = int(w * 0.08), int(h * 0.1)
-    yy, xx = np.ogrid[:h, :w]
-    blob = np.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * (min(w, h) * 0.07) ** 2))
-    arr[:, :, 1] = np.clip(arr[:, :, 1] + blob * 40, 0, 255)
+
+        x1 = min(w, x + bw)
+        y1 = min(h, y + bh)
+
+        if keep_rect is not None:
+            x0, y0, rx1, ry1 = keep_rect
+            if not (x1 < x0 or x > rx1 or y1 < y0 or y > ry1):
+                continue
+
+        arr[y:y1, x:x1, ch] = val
+
+    for _ in range(max(1, int(max(8, w * h // 6000) * power))):
+        x = int(rng.integers(0, max(w - 4, 1)))
+        y = int(rng.integers(0, max(h - 3, 1)))
+
+        if not _ok(x, y):
+            continue
+
+        bw = max(
+            1,
+            int(
+                rng.integers(4, max(5, min(30, w // 8 + 1)))
+                * power
+            ),
+        )
+        bh = max(
+            1,
+            int(
+                rng.integers(3, max(4, min(20, h // 8 + 1)))
+                * power
+            ),
+        )
+
+        x1 = min(w, x + bw)
+        y1 = min(h, y + bh)
+
+        if keep_rect is not None:
+            x0, y0, rx1, ry1 = keep_rect
+            if not (x1 < x0 or x > rx1 or y1 < y0 or y > ry1):
+                continue
+
+        arr[y:y1, x:x1, :] = 0
+
     return Image.fromarray(arr.clip(0, 255).astype(np.uint8))
 
 
@@ -615,7 +670,7 @@ def make_n6():
     d.text((36, 460), vig_c, fill=(240, 220, 120), font=font(56))
     d.text((36, 560), "Алфавит везде один: 32 буквы, без Ё.", fill=(110, 110, 120), font=font(20))
     # null cipher telestich as extra confirmation of ПОРТАЛ? skip to not leak
-    hack_glitch(img, seed=61).save(OUT / "n6_locks.png")
+    img.save(OUT / "n6_locks.png")
 
     print(f"  N6  A1Z26 of atbash(АТБАШ)={step1_c} → {nums}")
     print(f"  N6  atbash → {step1_plain}")
