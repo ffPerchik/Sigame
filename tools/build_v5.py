@@ -25,6 +25,11 @@ import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+try:
+    from .assign_question_types import apply_question_types, validate_question_types
+except ImportError:  # `python tools/build_v5.py`
+    from assign_question_types import apply_question_types, validate_question_types
+
 NS = "https://github.com/VladimirKhil/SI/blob/master/assets/siq_5.xsd"
 ET.register_namespace("", NS)
 
@@ -259,6 +264,12 @@ def main() -> int:
         n_qs = sum(len(t.find(f"{q('questions')}").findall(f"{q('question')}"))
                    for t in ths)
         print(f"  {rname}{' ['+rtype+']' if rtype else ''}: тем={n_themes}, вопросов={n_qs}")
+
+    type_assignments = apply_question_types(root)
+    validate_question_types(root)
+    print("специальные типы вопросов:")
+    for round_name, assigned_types in type_assignments.items():
+        print(f"  {round_name}: {', '.join(assigned_types)}")
 
     # имя/дата пакета
     root.set("name", "Zengame")
