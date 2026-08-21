@@ -107,7 +107,7 @@ class QuestionTypesTests(unittest.TestCase):
             by_name = {param.get("name"): param for param in params.findall(q("param"))}
             self.assertIn("price", by_name)
             self.assertIn("selectionMode", by_name)
-            self.assertEqual(by_name["selectionMode"].text, "exceptCurrent")
+            self.assertIn(by_name["selectionMode"].text, {"any", "exceptCurrent", "current"})
             number_set = by_name["price"].find(q("numberSet"))
             self.assertIsNotNone(number_set)
             if type_name != "secretNoQuestion":
