@@ -1,8 +1,15 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from tools.sigame_achievements import calculate_awards, parse_html_log, parse_text_log
+from tools.sigame_achievements import (
+    calculate_awards,
+    find_latest_log,
+    parse_html_log,
+    parse_text_log,
+)
 
 
 class SIGameAchievementsTests(unittest.TestCase):
@@ -51,6 +58,16 @@ Player B: -500
         self.assertEqual(game.players["Player A"].final_score, 700)
         self.assertEqual(game.players["Player B"].wrong_count, 5)
         self.assertTrue(any("PLAYER_ANSWER" in warning for warning in game.warnings))
+
+    def test_finds_latest_steam_log_by_default(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            logs_dir = Path(temp_dir) / "com.vladimirkhil.sigame" / "logs"
+            logs_dir.mkdir(parents=True)
+            steam_log = logs_dir / "game-log-2026-08-21.txt"
+            steam_log.write_text("test", encoding="utf-8")
+
+            with patch.dict(os.environ, {"LOCALAPPDATA": temp_dir}):
+                self.assertEqual(find_latest_log(None), steam_log)
 
 
 if __name__ == "__main__":

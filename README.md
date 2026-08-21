@@ -51,8 +51,8 @@ python3 tools/build_v5.py            # собрать zengame.siq
 
 ## Ачивки SIGame → подсказки квеста
 
-Настольная SIGame сохраняет HTML-журнал с ответами и изменениями счёта. После игры
-скрипт автоматически считает ачивки и формирует команды `/addhint` для бота:
+SIGame сохраняет журнал игры: Steam-версия — TXT, классическая — подробный HTML.
+После игры скрипт автоматически считает ачивки и формирует команды `/addhint` для бота:
 
 ```bash
 python tools/sigame_achievements.py path/to/game_log.html --map players.json

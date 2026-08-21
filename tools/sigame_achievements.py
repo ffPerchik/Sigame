@@ -539,28 +539,38 @@ def calculate_awards(game: GameData) -> dict[str, list[Award]]:
     return awards
 
 
-def _default_logs_dir() -> Path | None:
+def _default_logs_dirs() -> list[Path]:
     local_app_data = os.environ.get("LOCALAPPDATA")
     if not local_app_data:
-        return None
-    return Path(local_app_data) / "Khil-soft" / "SIGame" / "Logs"
+        return []
+
+    root = Path(local_app_data)
+    return [
+        # Steam / SIGame 8 (Tauri app_log_dir).
+        root / "com.vladimirkhil.sigame" / "logs",
+        # Классическая настольная SIGame 7.
+        root / "Khil-soft" / "SIGame" / "Logs",
+    ]
 
 
 def find_latest_log(path: Path | None) -> Path:
-    base = path or _default_logs_dir()
-    if base is None:
+    bases = [path] if path is not None else _default_logs_dirs()
+    if not bases:
         raise FileNotFoundError("Не задан журнал и не найдена переменная LOCALAPPDATA.")
-    if base.is_file():
-        return base
-    if not base.exists():
-        raise FileNotFoundError(f"Папка журналов не найдена: {base}")
 
-    candidates = [
-        item for item in base.rglob("*")
-        if item.is_file() and item.suffix.lower() in {".html", ".htm", ".txt"}
-    ]
+    candidates: list[Path] = []
+    for base in bases:
+        if base.is_file():
+            candidates.append(base)
+        elif base.exists():
+            candidates.extend(
+                item for item in base.rglob("*")
+                if item.is_file() and item.suffix.lower() in {".html", ".htm", ".txt"}
+            )
+
     if not candidates:
-        raise FileNotFoundError(f"В {base} нет журналов HTML/TXT.")
+        checked = ", ".join(str(base) for base in bases)
+        raise FileNotFoundError(f"Журналы HTML/TXT не найдены. Проверено: {checked}")
     return max(candidates, key=lambda item: item.stat().st_mtime)
 
 
