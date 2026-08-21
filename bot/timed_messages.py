@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import random
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -53,11 +54,12 @@ async def send_typewriter(
     send: Callable[[str], Awaitable[object]],
     edit: Callable[[object, str], Awaitable[object]],
     *,
-    chunk_size: int = 1,
+    chunk_size: int = 3,
     interval: float = 0.15,
     sleep: Callable[[float], Awaitable[object]] = asyncio.sleep,
+    randint: Callable[[int, int], int] = random.randint,
 ) -> object | None:
-    """Отправляет начало текста и допечатывает его редактированием сообщения."""
+    """Допечатывает сообщение случайными порциями от 1 до `chunk_size` символов."""
     text = text.strip()
     if not text:
         return None
@@ -69,10 +71,14 @@ async def send_typewriter(
     # промежуточный вариант, заканчивающийся пробелом, был бы идентичен текущему
     # и вызвал бы Bad Request: message is not modified. Добавляем такой пробел
     # вместе со следующим видимым символом.
-    ends = list(range(chunk_size, len(text) + 1, chunk_size))
-    if not ends or ends[-1] != len(text):
-        ends.append(len(text))
-    versions = [text[:end] for end in ends if end == len(text) or not text[end - 1].isspace()]
+    ends: list[int] = []
+    end = 0
+    while end < len(text):
+        step = max(1, min(chunk_size, int(randint(1, chunk_size))))
+        end = min(len(text), end + step)
+        if end == len(text) or not text[end - 1].isspace():
+            ends.append(end)
+    versions = [text[:end] for end in ends]
 
     message = await send(versions[0])
     for partial in versions[1:]:
