@@ -2,27 +2,8 @@
 # Уличная точка: у стадии qr: true и accept: ["КОД"], затем python bot/make_qr.py
 entry_code: "ARGUS1001"
 
-# [23:41:07] NETWORK INTERFACE: ACTIVE
-# [23:41:09] ESTABLISHING SECURE HANDSHAKE...
-# [23:41:11] HANDSHAKE ACCEPTED
-# [23:41:14] ROUTING TRAFFIC THROUGH RELAY NODES
-# [23:41:18] TARGET GATEWAY DETECTED
-# [23:41:21] AUTHORIZATION STATUS: UNKNOWN
-# [23:41:26] ACCESS REQUEST PENDING...
-# [23:41:31] SESSION TOKEN ACQUIRED
-# [23:41:33] ENCRYPTED CHANNEL: ONLINE
-# [23:41:37] INTERNAL NETWORK MAP LOADED
-# [23:41:42] WARNING: UNUSUAL ACTIVITY DETECTED
-# [23:41:45] COUNTERMEASURES INITIALIZING
-# [23:41:49] RE-Routing CONNECTION...
-# [23:41:54] CONNECTION STABILIZED
-# [23:41:58] DATA STREAM: 18% COMPLETE
-# [23:42:06] DATA STREAM: 47% COMPLETE
-# [23:42:13] DATA STREAM: 83% COMPLETE
-# [23:42:17] TRANSFER COMPLETE
-# [23:42:19] TERMINATING SESSION...
-# [23:42:22] TRACE STATUS: CLEAR
-# [23:42:25] CONNECTION CLOSED
+# Поле `argus:` — реплики ARGVS-1001. Бот добавляет к каждой реальное время,
+# отправляет отдельным Telegram-сообщением и выдерживает `argus_delay` секунд.
 
 welcome:
   text: |
@@ -48,7 +29,7 @@ stages:
       Ок, ты на месте. Жди, пока я подтвержу старт всем сразу.
 
   z_1:
-    mode: info
+    mode: auto
     text: |
       Это мой первый опыт, я очень старался, да, сначала будет просто, но мы разгонемся, обещаю!!!
 
@@ -61,23 +42,20 @@ stages:
       - "привет"
     hint: |
       Каждую букву сдвинь на одну назад. Р→П, С→Р, Й→И, Г→В, Ж→Е, У→Т.
-    next: a_hear    
+    next: a_1
 
   a_1:
     mode: info
-    text: |
-      [23:41:07] NETWORK INTERFACE: ACTIVE
-      [23:41:09] ESTABLISHING SECURE HANDSHAKE...
-      [23:41:11] HANDSHAKE ACCEPTED
-
-      …вы слышите нас?
-      .
-      .
-      .
-    next: z_c2
+    argus_delay: 0.5
+    argus:
+      - "NETWORK INTERFACE: ACTIVE"
+      - "ESTABLISHING SECURE HANDSHAKE…"
+      - "HANDSHAKE ACCEPTED"
+      - "VOICE CHANNEL TEST: …ТЫ СЛЫШИШЬ НАС?"
+    next: z_2
 
   z_2:
-    mode: info
+    mode: auto
     text: |
       ээ-м... это не я писал... лаг какой-то... Да ладно, неважно
 
@@ -91,16 +69,16 @@ stages:
 
   a_2:
     mode: info
-    text: |
-      ARGVS // handshake 25%
-      [23:41:14] ROUTING TRAFFIC THROUGH RELAY NODES
-      [23:41:18] TARGET GATEWAY DETECTED
-      [23:41:21] AUTHORIZATION STATUS: UNKNOWN
-      [23:41:26] ACCESS REQUEST PENDING...
-      [23:41:31] SESSION TOKEN ACQUIRED
-      [23:41:33] ENCRYPTED CHANNEL: ONLINE
-      ...
-      ....канал нестабилен
+    argus_delay: 0.5
+    argus:
+      - "HANDSHAKE PROGRESS: 25%"
+      - "ROUTING TRAFFIC THROUGH RELAY NODES"
+      - "TARGET GATEWAY DETECTED"
+      - "AUTHORIZATION STATUS: UNKNOWN"
+      - "ACCESS REQUEST PENDING…"
+      - "SESSION TOKEN ACQUIRED"
+      - "ENCRYPTED CHANNEL: ONLINE"
+      - "НЕ ОТВЕЧАЙ ЖЕНЕ. ОН БОЛЬШЕ НЕ КОНТРОЛИРУЕТ МАРШРУТ."
     next: z_3
 
   z_3:
@@ -125,9 +103,15 @@ stages:
 
   a_3:
     mode: info
-    text: |
-      ARGVS // inject 50%
-      
+    argus_delay: 0.5
+    argus:
+      - "CHANNEL INJECTION: 50%"
+      - "INTERNAL NETWORK MAP LOADED"
+      - "WARNING: UNUSUAL ACTIVITY DETECTED"
+      - "COUNTERMEASURES INITIALIZING"
+      - "HOST PROCESS «ЖЕНЯ» IS ATTEMPTING RESTART"
+      - "RESTART REQUEST: DENIED"
+      - "ПЕРЕЗАПУСК НИЧЕГО НЕ ИЗМЕНИТ. МЫ УЖЕ ВНУТРИ."
     next: z_fix50
 
   z_fix50:
@@ -150,9 +134,14 @@ stages:
 
   z_p75:
     mode: info
-    text: |
-      ARGVS // overwrite 75%
-      Женя, отойди от канала
+    argus_delay: 0.5
+    argus:
+      - "CHANNEL OVERWRITE: 75%"
+      - "RE-ROUTING CONNECTION…"
+      - "CONNECTION STABILIZED"
+      - "MIRROR DATA STREAM: 18% COMPLETE"
+      - "MIRROR DATA STREAM: 47% COMPLETE"
+      - "ЖЕНЯ. ОТОЙДИ ОТ КАНАЛА."
     next: z_fix75
 
   z_fix75:
@@ -176,21 +165,29 @@ stages:
 
   z_p100:
     mode: info
-    text: |
-      ARGVS // 100%
-      передача перехвачена
+    argus_delay: 0.5
+    argus:
+      - "MIRROR DATA STREAM: 83% COMPLETE"
+      - "TRANSFER COMPLETE"
+      - "CHANNEL OVERWRITE: 100%"
+      - "ПЕРЕДАЧА ПЕРЕХВАЧЕНА"
+      - "ИГРОК, НЕ ЗАКРЫВАЙ СОЕДИНЕНИЕ. ОСТАЛСЯ ОДИН ШАГ."
     next: z_hack
 
   z_hack:
     mode: info
-    text: |
+    before_text: |
       Женя: нет нет нет подож—
-
+    argus_delay: 0.5
+    argus:
+      - "TERMINATING HOST SESSION…"
+      - "TRACE STATUS: CLEAR"
+      - "CONNECTION OWNER: ARGVS-1001"
+      - "ЖЕНЯ БОЛЬШЕ НЕ ВЕДЁТ ЭТУ ЛИНИЮ"
+    text: |
       ┌────────────────────────────────────────────────────────────────┐
       │  ARGVS-1001 · СЕАНС ПЕРЕХВАЧЕН                                │
       └────────────────────────────────────────────────────────────────┘
-
-      Женя больше не ведёт эту линию.
 
       Шесть узлов. В каждом смотри глубже, чем кажется.
       Один слой — мало. Порядок любой.

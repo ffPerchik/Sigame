@@ -18,11 +18,13 @@ try:  # `python -m bot.bot`
     from . import config as cfg
     from . import db, quest
     from . import texts as T
+    from .argus import send_lines as send_argus_lines
 except ImportError:  # `python bot/bot.py` или запуск из папки bot
     import config as cfg
     import db
     import quest
     import texts as T
+    from argus import send_lines as send_argus_lines
 
 BASE = Path(__file__).resolve().parent
 
@@ -92,6 +94,20 @@ async def send_stage(uid: int, stage_id: str) -> None:
     if not st:
         await bot.send_message(uid, T.STAGE_MISSING.format(stage=stage_id))
         return
+    before_text = (st.get("before_text") or "").strip()
+    if before_text:
+        await bot.send_message(uid, before_text)
+
+    argus_lines = st.get("argus") or []
+    if isinstance(argus_lines, str):
+        argus_lines = [argus_lines]
+    if argus_lines:
+        await send_argus_lines(
+            argus_lines,
+            lambda line: bot.send_message(uid, line),
+            delay=st.get("argus_delay", 0.5),
+        )
+
     text = (st.get("text") or "").strip()
     media_dir = BASE / "quest" / "images"
     for field, sender, kind_label in (
@@ -109,7 +125,8 @@ async def send_stage(uid: int, stage_id: str) -> None:
             return
         except Exception as e:
             print(T.MEDIA_FAIL.format(kind=kind_label, path=path, err=e))
-    await bot.send_message(uid, text)
+    if text:
+        await bot.send_message(uid, text)
 
 
 # ======================== HUB ===============================================
@@ -296,10 +313,9 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
             await notify_host(T.NEW_PLAYER_GATE.format(name=name, username=username))
             if cfg.HOST_CONSOLE:
                 _host_print(f"HOST_CONSOLE=1 → автозапуск игрока {uid} (@{username})")
-                db.set_stage(uid, "z_hello")
+                db.set_stage(uid, "z_1")
                 db.log_event(uid, "gate_approved", "console")
-                await send_stage(uid, "z_hello")
-                await advance(uid)
+                await send_stage(uid, "z_1")
             else:
                 await send_host(
                     f"🆕 {name} (@{username}) ждёт старта.",
@@ -328,7 +344,7 @@ async def cb_gate_approve(cq: CallbackQuery) -> None:
     if cq.from_user.id != cfg.HOST_ID:
         return await cq.answer(T.ONLY_HOST, show_alert=True)
     uid = int(cq.data.split(":", 1)[1])
-    db.set_stage(uid, "z_hello")
+    db.set_stage(uid, "z_1")
     db.log_event(uid, "gate_approved")
     await cq.answer("✅ Игрок запущен!")
     try:
@@ -336,8 +352,7 @@ async def cb_gate_approve(cq: CallbackQuery) -> None:
     except Exception:
         pass
     await notify_host(T.GATE_APPROVED.format(uid=uid))
-    await send_stage(uid, "z_hello")
-    await advance(uid)
+    await send_stage(uid, "z_1")
 
 
 @dp.callback_query(F.data.startswith("gate_rej:"))
