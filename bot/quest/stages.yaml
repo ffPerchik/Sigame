@@ -1,4 +1,5 @@
 # ARG «Аргус-1001» — хаб, 6 независимых узлов.
+# Уличная точка: у стадии qr: true и accept: ["КОД"], затем python bot/make_qr.py
 entry_code: "ARGUS1001"
 
 welcome:
