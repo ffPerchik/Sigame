@@ -32,7 +32,7 @@ stages:
       - speaker: zhenya
         delay: 1.5
         text: |
-          Это мой первый опыт, я очень старался, да, сначала будет просто, но мы разгонемся, обещаю!!!
+          Это мой первый опыт, я очень старался!!! Да, сначала будет просто, но мы разгонемся, обещаю!!!
           Ну что же, давай начнём
 
       - speaker: zhenya
@@ -50,10 +50,10 @@ stages:
   a_1:
     mode: info
     messages:
-      - {speaker: argus, delay: 0.5, text: "NETWORK INTERFACE: ACTIVE"}
-      - {speaker: argus, delay: 0.5, text: "ESTABLISHING SECURE HANDSHAKE…"}
-      - {speaker: argus, delay: 0.5, text: "HANDSHAKE ACCEPTED"}
-      - {speaker: argus, delay: 0.5, text: "VOICE CHANNEL TEST: …ТЫ СЛЫШИШЬ НАС?"}
+      - {speaker: argus, delay: 1.5, text: "NETWORK INTERFACE: ACTIVE"}
+      - {speaker: argus, delay: 1.5, text: "ESTABLISHING SECURE HANDSHAKE…"}
+      - {speaker: argus, delay: 1.5, text: "HANDSHAKE ACCEPTED"}
+      - {speaker: argus, delay: 1.5, text: "VOICE CHANNEL TEST: …ТЫ СЛЫШИШЬ НАС?"}
     next: z_2
 
   z_2:
@@ -74,22 +74,24 @@ stages:
   a_2:
     mode: info
     messages:
-      - {speaker: argus, delay: 0.5, text: "HANDSHAKE PROGRESS: 25%"}
-      - {speaker: argus, delay: 0.5, text: "TARGET GATEWAY DETECTED"}
-      - {speaker: argus, delay: 0.5, text: "AUTHORIZATION STATUS: UNKNOWN"}
-      - {speaker: argus, delay: 0.5, text: "ENCRYPTED CHANNEL: ONLINE"}
+      - {speaker: argus, delay: 1.5, text: "HANDSHAKE PROGRESS: 25%"}
+      - {speaker: argus, delay: 1.5, text: "TARGET GATEWAY DETECTED"}
+      - {speaker: argus, delay: 1.5, text: "AUTHORIZATION STATUS: UNKNOWN"}
+      - {speaker: argus, delay: 1.5, text: "ENCRYPTED CHANNEL: ONLINE"}
     next: z_3
 
   z_3:
     mode: info
     speaker: zhenya
-    delay: 1.5
+    delay: 4
     text: |
       Чё, какой 25? 25% чего? Какой к чёрту канал? Ты тоже видишь эти сообщения?
-      Я сейчас перезапущу бота. подожди, вот ещё одна задачка, пока перезапускается.
-
+      Я сейчас перезапущу бота. Подожди немного, а пока вот ещё одна задачка, пока перезапускается.
+    next: picture_1
+    
+  picture_1:
+    mode: info
     document: z_3.png -c
-
     hint: |
       Да, надо просто прочитать, что скрыто на картинке.
     next: a_3
@@ -97,10 +99,10 @@ stages:
   a_3:
     mode: info
     messages:
-      - {speaker: argus, delay: 0.5, text: "CHANNEL INJECTION: 50%"}
-      - {speaker: argus, delay: 0.5, text: "*WARNING*: UNUSUAL ACTIVITY DETECTED"}
-      - {speaker: argus, delay: 0.5, text: "HOST PROCESS «kolysheev» IS ATTEMPTING RESTART"}
-      - {speaker: argus, delay: 0.5, text: "RESTART EMITATION: STARTED"}
+      - {speaker: argus, delay: 1.5, text: "CHANNEL INJECTION: 50%"}
+      - {speaker: argus, delay: 1.5, text: "**WARNING**: UNUSUAL ACTIVITY DETECTED"}
+      - {speaker: argus, delay: 1.5, text: "HOST PROCESS «__kolysheev__» IS ATTEMPTING RESTART"}
+      - {speaker: argus, delay: 1.5, text: "RESTART EMITATION: STARTED"}
     next: bot_1
 
   bot_1:
@@ -131,31 +133,26 @@ stages:
   z_a_final:
     mode: info
     messages:
-      - {speaker: argus, delay: 0.5, text: "CHANNEL OVERWRITE: 75%"}
-      - {speaker: argus, delay: 0.5, text: "CONNECTION STABILIZED"}
-      - {speaker: argus, delay: 0.5, text: "TRANSFER COMPLETE"}
-      - {speaker: argus, delay: 0.5, text: "CHANNEL OVERWRITE: 100%"}
-      - {speaker: argus, delay: 0.5, text: "ПЕРЕДАЧА ПЕРЕХВАЧЕНА"}
-      - {speaker: argus, delay: 0.5, text: "ИГРОК, НЕ ЗАКРЫВАЙ СОЕДИНЕНИЕ. ОСТАЛСЯ ОДИН ШАГ."}
-      - {speaker: zhenya, delay: 1.5, text: "Женя: нет нет нет подож—"}
-      - {speaker: argus, delay: 0.5, text: "TERMINATING HOST SESSION…"}
-      - {speaker: argus, delay: 0.5, text: "TRACE STATUS: CLEAR"}
-      - {speaker: argus, delay: 0.5, text: "CONNECTION OWNER: ARGVS-1001"}
-      - {speaker: argus, delay: 0.5, text: "ЖЕНЯ БОЛЬШЕ НЕ ВЕДЁТ ЭТУ ЛИНИЮ"}
+      - {speaker: argus, delay: 1.5, text: "CHANNEL OVERWRITE: 75%"}
+      - {speaker: argus, delay: 1.5, text: "CONNECTION STABILIZED"}
+      - {speaker: argus, delay: 1.5, text: "CHANNEL OVERWRITE: 100%"}
+      - {speaker: argus, delay: 1.5, text: "ПЕРЕДАЧА ПЕРЕХВАЧЕНА"}
+      - {speaker: argus, delay: 1.5, text: "ИГРОК, НЕ ЗАКРЫВАЙ СОЕДИНЕНИЕ. ОСТАЛСЯ ОДИН ШАГ."}
+      - {speaker: zhenya, delay: 2.5, text: "нет нет нет подож——————————"}
+      - {speaker: argus, delay: 3, text: "TERMINATING HOST SESSION…"}
+      - {speaker: argus, delay: 1.5, text: "CONNECTION OWNER: ARGVS-1001"}
+      - {speaker: argus, delay: 1.5, text: "ЖЕНИ БОЛЬШЕ НЕТ"}
     next: z_hack
 
   z_hack:
     mode: info
     messages:
 
-      - delay: 0.5
+      - delay: 10
         text: |
           ┌────────────────────────────────────────────────────────────────┐
-          │  ARGVS-1001 · СЕАНС ПЕРЕХВАЧЕН                                │
+          │  ARGVS-1001 · СЕАНС ПЕРЕХВАЧЕН                                 │
           └────────────────────────────────────────────────────────────────┘
-
-          Шесть узлов. В каждом смотри глубже, чем кажется.
-          Один слой — мало. Порядок любой.
     next: quest_gate
 
   quest_gate:
@@ -164,11 +161,8 @@ stages:
     correct_text: ""
     wrong_argus: "КЛЮЧ ОТКЛОНЁН. ВЕРНИСЬ К КОНТЕЙНЕРУ SIGAME И ИЩИ ВНИМАТЕЛЬНЕЕ."
     messages:
-      - {speaker: argus, delay: 0.5, text: "ПРОЛОГ ЗАВЕРШЁН"}
-      - {speaker: argus, delay: 0.5, text: "ОСНОВНОЙ ПРОТОКОЛ: LOCKED"}
-      - {speaker: argus, delay: 0.5, text: "ШЕСТЬ УЗЛОВ ПОДГОТОВЛЕНЫ"}
-      - {speaker: argus, delay: 0.5, text: "ДОПУСК ТРЕБУЕТ КЛЮЧ АКТИВАЦИИ ИЗ КОНТЕЙНЕРА SIGAME"}
-      - {speaker: argus, delay: 0.5, text: "ВВЕДИ КЛЮЧ. ДОКАЖИ, ЧТО ВЫ НЕ БЕЗНАДЁЖНЫ."}
+      - {speaker: argus, delay: 0.5, text: "ДОПУСК ТРЕБУЕТ КЛЮЧ АКТИВАЦИИ ИЗ КОНТЕЙНЕРА"}
+      - {speaker: argus, delay: 0.5, text: "ВВЕДИ КЛЮЧ. ДОКАЖИ, ЧТО ТЫ НЕ БЕЗНАДЁЖН."}
     hint: |
       Ключ был спрятан внутри zengame.siq рядом с посланием, которое привело тебя в бот.
     next: quest_unlocked
@@ -177,8 +171,6 @@ stages:
     mode: info
     messages:
       - {speaker: argus, delay: 0.5, text: "ACTIVATION KEY ACCEPTED"}
-      - {speaker: argus, delay: 0.5, text: "ПРОВЕРКА ЗАВЕРШЕНА: ВЫ НЕ БЕЗНАДЁЖНЫ"}
-      - {speaker: argus, delay: 0.5, text: "ОСНОВНОЙ ПРОТОКОЛ: UNLOCKED"}
       - {speaker: argus, delay: 0.5, text: "ДОСТУП К ШЕСТИ УЗЛАМ РАЗРЕШЁН"}
     next: hub
 
