@@ -24,7 +24,6 @@ class StartTextTests(unittest.TestCase):
             for line in text.splitlines()
             if re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", line.strip())
         ]
-        # Первый блок переносится по 64 символа, последний короткий блок — ключ.
         key = base64.b64decode(encoded_lines[-1]).decode("utf-8")
         greeting = base64.b64decode("".join(encoded_lines[:-1])).decode("utf-8")
         self.assertEqual(key, "ARGUS1001")
@@ -32,10 +31,14 @@ class StartTextTests(unittest.TestCase):
         configured_key = re.search(r'^entry_code:\s*["\']?([^"\'\s]+)', stages_text, re.MULTILINE)
         self.assertIsNotNone(configured_key)
         self.assertEqual(key, configured_key.group(1))
-        self.assertIn("@Zengame_checker_bot", greeting)
-        self.assertIn("ОБЫЧНЫЙ START", greeting)
-        self.assertIn("СОХРАНИ ЕГО", greeting)
-        self.assertIn("ПОСЛЕ ПРОЛОГА ARGVS ПОТРЕБУЕТ КЛЮЧ", greeting)
+        self.assertEqual(
+            greeting,
+            "ПОЗДРАВЛЯЮ, ты не безнадёжен, ARGUS впечатлён. Ниже код, который даст тебе доступ. "
+            "Дальше КАЖДЫЙ САМ ЗА СЕБЯ. СЛЕДУЮЩИЙ СЛОЙ СПРЯТАН ГЛУБЖЕ: В КАРТИНКАХ, "
+            "В ОТВЕТАХ, В ШИФРАХХОРОШО СПРЯТАННОЕ — ХОРОШО НАЙДЁННОЕ."
+        )
+        self.assertIn("Первое послание закодировано. Расшифруй:", text)
+        self.assertIn("Та же кодировка:", text)
 
 
 if __name__ == "__main__":

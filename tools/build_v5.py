@@ -17,7 +17,6 @@
 """
 from __future__ import annotations
 
-import base64
 import datetime
 import hashlib
 import sys
@@ -175,41 +174,35 @@ ROUND_PLAN = [
 
 
 def quest_start_text() -> str:
-    """Скрытый START.txt внутри .siq — первый (расширяемый) шаг квеста.
-
-    Два слоя Base64:
-      • первый — адрес бота и инструкция начать пролог обычным /start;
-      • второй — код активации (entry_code в stages.yaml), который попросит Аргус.
-    """
-    greet = ("ПОЗДРАВЛЯЮ. ТЫ НАШЁЛ ВХОД В ИНДИВИДУАЛЬНЫЙ КВЕСТ — "
-             "КАЖДЫЙ ИДЁТ САМ ЗА СЕБЯ. ОТКРОЙ TELEGRAM-БОТА "
-             "@Zengame_checker_bot И НАЖМИ ОБЫЧНЫЙ START. "
-             "НЕ ВВОДИ КЛЮЧ СРАЗУ: СОХРАНИ ЕГО. "
-             "ПОСЛЕ ПРОЛОГА ARGVS ПОТРЕБУЕТ КЛЮЧ АКТИВАЦИИ, "
-             "ЧТОБЫ ПРОВЕРИТЬ, ЧТО ВЫ НЕ БЕЗНАДЁЖНЫ. "
-             "ХОРОШО СПРЯТАННОЕ — ХОРОШО НАЙДЁННОЕ.")
-    code = "ARGUS1001"
-    a = base64.b64encode(greet.encode("utf-8")).decode("ascii")
-    b = base64.b64encode(code.encode("utf-8")).decode("ascii")
-    a_lines = "\n".join(a[i:i + 64] for i in range(0, len(a), 64))
-    b_lines = "\n".join(b[i:i + 64] for i in range(0, len(b), 64))
+    """Точный текст START.txt, согласованный с содержимым готового пакета."""
+    message = (
+        "0J/QntCX0JTQoNCQ0JLQm9Cv0K4sINGC0Ysg0L3QtSDQsdC10LfQvdCw0LTRkdC20LXQvSwg"
+        "QVJHVVMg0LLQv9C10YfQsNGC0LvRkdC9LiDQndC40LbQtSDQutC+0LQsINC60L7RgtC+0YDR"
+        "i9C5INC00LDRgdGCINGC0LXQsdC1INC00L7RgdGC0YPQvy4g0JTQsNC70YzRiNC1INCa0JDQ"
+        "ltCU0KvQmSDQodCQ0Jwg0JfQkCDQodCV0JHQry4g0KHQm9CV0JTQo9Cu0KnQmNCZINCh0JvQ"
+        "ntCZINCh0J/QoNCv0KLQkNCdINCT0JvQo9CR0JbQlTog0JIg0JrQkNCg0KLQmNCd0JrQkNCl"
+        "LCDQkiDQntCi0JLQldCi0JDQpSwg0JIg0KjQmNCk0KDQkNCl0KXQntCg0J7QqNCeINCh0J/Q"
+        "oNCv0KLQkNCd0J3QntCVIOKAlCDQpdCe0KDQntCo0J4g0J3QkNCZ0JTQgdCd0J3QntCVLg=="
+    )
+    key = "QVJHVVMxMDAx"
     return (
         "   ╔══════════════════════════════════════════════╗\n"
-        "   ║   ВЫ НАШЛИ НАЧАЛО                             ║\n"
+        "   ║   ВЫ НАШЛИ НАЧАЛО                                          ║\n"
         "   ╚══════════════════════════════════════════════╝\n"
         "\n"
         "   Тот, кто читает это, — перестал быть просто игроком.\n"
+        "\n"
         "   Дальше каждый сам за себя.\n"
         "\n"
-        "   Первое послание закодировано (Base64 → UTF-8). Расшифруй:\n"
+        "   Первое послание закодировано. Расшифруй:\n"
         "\n"
-        f"{a_lines}\n"
+        f"{message}\n"
         "\n"
-        "   Второй блок — ключ активации Аргуса. Та же кодировка. Сохрани его:\n"
+        "   Та же кодировка:\n"
         "\n"
-        f"{b_lines}\n"
+        f"{key}\n"
         "\n"
-        "   — хороший поиск вознаграждается. Продолжение следует.\n"
+        "   — хороший поиск вознаграждается.\n"
     )
 
 
