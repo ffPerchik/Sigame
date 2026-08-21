@@ -5,8 +5,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tools.sigame_achievements import (
+    QuestionContext,
     calculate_awards,
     find_latest_log,
+    load_package_questions,
     parse_html_log,
     parse_text_log,
 )
@@ -31,7 +33,6 @@ class SIGameAchievementsTests(unittest.TestCase):
         game = parse_html_log(Path("game.html"), "".join(parts))
         self.assertEqual(game.players["Alice"].final_score, 6700)
         self.assertEqual(game.players["Alice"].right_count, 7)
-        self.assertEqual(game.players["Alice"].answer_67_count, 1)
         self.assertEqual(game.players["Bob"].wrong_count, 2)
 
         awards = calculate_awards(game)
@@ -39,25 +40,43 @@ class SIGameAchievementsTests(unittest.TestCase):
         bob_codes = {award.code for award in awards["Bob"]}
         self.assertIn("champion", alice_codes)
         self.assertIn("almost_6767", alice_codes)
-        self.assertIn("area_67", alice_codes)
         self.assertIn("professor_minus", bob_codes)
-        self.assertIn("longread", bob_codes)
 
     def test_sionline_text_log(self):
-        content = """Player A: +100
+        content = """Theme A, 900
+Player A: +100
+Theme B, 200
 Player B: -200
 Game statistics:
-Player A: Right: 4/1000, Wrong: 2/300
+ⓈPlayer A: Right: 4/1000, Wrong: 2/300
 Player B: Right: 1/400, Wrong: 5/900
 Game results
-Player A: 700
+ⓈPlayer A: 700
 Player B: -500
 """
-        game = parse_text_log(Path("game.txt"), content)
-        self.assertEqual(game.players["Player A"].right_count, 4)
-        self.assertEqual(game.players["Player A"].final_score, 700)
+        question_index = {
+            ("Theme A", 900): QuestionContext("Round 1", "Theme A", 900),
+            ("Theme B", 200): QuestionContext("Round 1", "Theme B", 200),
+        }
+        game = parse_text_log(Path("game.txt"), content, question_index)
+        self.assertEqual(game.players["ⓈPlayer A"].right_count, 4)
+        self.assertEqual(game.players["ⓈPlayer A"].final_score, 700)
+        self.assertEqual(game.players["ⓈPlayer A"].right_by_theme, {"Theme A": 1})
+        self.assertEqual(len(game.outcomes), 2)
+        self.assertEqual(game.outcomes[0].player, "ⓈPlayer A")
+        self.assertEqual(game.outcomes[0].question_price, 900)
         self.assertEqual(game.players["Player B"].wrong_count, 5)
-        self.assertTrue(any("PLAYER_ANSWER" in warning for warning in game.warnings))
+        self.assertFalse(game.warnings)
+
+        awards = calculate_awards(game)
+        player_a_codes = {award.code for award in awards["ⓈPlayer A"]}
+        self.assertIn("big_game_hunter", player_a_codes)
+        self.assertIn("round_king_1", player_a_codes)
+
+    def test_loads_question_context_from_package(self):
+        index = load_package_questions(Path("zengame.siq"))
+        context = index[("🎬 Кинчик", 100)]
+        self.assertEqual(context.round_name, "Киномания")
 
     def test_finds_latest_steam_log_by_default(self):
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -2,8 +2,8 @@
 """Подсчёт ачивок и подсказок по журналу SIGame.
 
 Поддерживаются:
-* HTML-журнал настольной SIGame (предпочтительно: содержит тексты ответов);
-* TXT-журнал SIOnline (агрегаты GAME_STATISTICS, без текстов ответов).
+* TXT-журнал Steam/SIOnline с выбором вопросов и изменениями счёта;
+* HTML-журнал классической настольной SIGame.
 
 Зависимостей вне стандартной библиотеки Python нет.
 """
@@ -16,6 +16,8 @@ import json
 import os
 import re
 import sys
+import xml.etree.ElementTree as ET
+import zipfile
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from html.parser import HTMLParser
@@ -43,12 +45,22 @@ class RawOutcome:
     delta: int
 
 
+@dataclass(frozen=True)
+class QuestionContext:
+    round_name: str
+    theme: str
+    price: int
+
+
 @dataclass
 class Outcome:
     sequence: int
     player: str
     delta: int
     answer: str | None = None
+    round_name: str | None = None
+    theme: str | None = None
+    question_price: int | None = None
 
 
 @dataclass
@@ -66,8 +78,13 @@ class PlayerMetrics:
     max_right_streak: int = 0
     max_wrong_streak: int = 0
     returned_to_zero: bool = False
-    answer_67_count: int = 0
     answers: list[str] = field(default_factory=list)
+    right_by_theme: dict[str, int] = field(default_factory=dict)
+    wrong_by_theme: dict[str, int] = field(default_factory=dict)
+    right_by_round: dict[str, int] = field(default_factory=dict)
+    wrong_by_round: dict[str, int] = field(default_factory=dict)
+    right_by_price: dict[int, int] = field(default_factory=dict)
+    wrong_by_price: dict[int, int] = field(default_factory=dict)
 
     @property
     def attempts(self) -> int:
@@ -256,9 +273,18 @@ def _calculate_metrics(players: dict[str, PlayerMetrics], outcomes: list[Outcome
         player.max_right_streak = max(player.max_right_streak, current_right_streak[outcome.player])
         player.max_wrong_streak = max(player.max_wrong_streak, current_wrong_streak[outcome.player])
 
-    token_67 = re.compile(r"(?<!\d)67(?!\d)")
-    for player in players.values():
-        player.answer_67_count = sum(len(token_67.findall(answer)) for answer in player.answers)
+        if outcome.theme:
+            target = player.right_by_theme if outcome.delta > 0 else player.wrong_by_theme
+            if outcome.delta != 0:
+                target[outcome.theme] = target.get(outcome.theme, 0) + 1
+        if outcome.round_name:
+            target = player.right_by_round if outcome.delta > 0 else player.wrong_by_round
+            if outcome.delta != 0:
+                target[outcome.round_name] = target.get(outcome.round_name, 0) + 1
+        if outcome.question_price is not None:
+            target = player.right_by_price if outcome.delta > 0 else player.wrong_by_price
+            if outcome.delta != 0:
+                target[outcome.question_price] = target.get(outcome.question_price, 0) + 1
 
 
 def parse_html_log(path: Path, content: str) -> GameData:
@@ -268,6 +294,29 @@ def parse_html_log(path: Path, content: str) -> GameData:
     return _build_game_from_raw(str(path), parser.player_names, parser.answers, parser.outcomes)
 
 
+def load_package_questions(path: Path) -> dict[tuple[str, int], QuestionContext]:
+    """Строит индекс (тема, номинал) → раунд из SIQ-пакета."""
+
+    with zipfile.ZipFile(path) as package:
+        root = ET.fromstring(package.read("content.xml"))
+
+    def local_name(tag: str) -> str:
+        return tag.rsplit("}", 1)[-1]
+
+    index: dict[tuple[str, int], QuestionContext] = {}
+    for round_node in (node for node in root.iter() if local_name(node.tag) == "round"):
+        round_name = round_node.get("name", "")
+        for theme_node in (node for node in round_node.iter() if local_name(node.tag) == "theme"):
+            theme_name = theme_node.get("name", "")
+            for question_node in (node for node in theme_node.iter() if local_name(node.tag) == "question"):
+                try:
+                    price = int(question_node.get("price", "0"))
+                except ValueError:
+                    continue
+                index[(theme_name, price)] = QuestionContext(round_name, theme_name, price)
+    return index
+
+
 STAT_LINE_RE = re.compile(
     r"^(?P<name>.+?):\s*Right:\s*(?P<right>\d+)\s*/\s*(?P<right_total>-?\d+)\s*,\s*"
     r"Wrong:\s*(?P<wrong>\d+)\s*/\s*(?P<wrong_total>-?\d+)\s*$",
@@ -275,7 +324,11 @@ STAT_LINE_RE = re.compile(
 )
 
 
-def parse_text_log(path: Path, content: str) -> GameData:
+def parse_text_log(
+    path: Path,
+    content: str,
+    question_index: dict[tuple[str, int], QuestionContext] | None = None,
+) -> GameData:
     """Читает скачанный TXT-журнал SIOnline.
 
     SIOnline пишет GAME_STATISTICS в стабильном формате с английскими метками
@@ -301,19 +354,66 @@ def parse_text_log(path: Path, content: str) -> GameData:
     raw_outcomes: list[Outcome] = []
     sequence = 0
 
+    # WINNER пишет финальный блок «Имя: итог». Отрицательный итог синтаксически
+    # совпадает со списанием, поэтому заранее исключаем последнее такое вхождение.
+    final_results: dict[str, int] = {}
+    final_result_line_indexes: set[int] = set()
+    for name in players:
+        result_re = re.compile(rf"^{re.escape(name)}:\s*(-?\d+)\s*$")
+        matches = [
+            (line_index, int(match.group(1)))
+            for line_index, line in enumerate(lines)
+            if (match := result_re.match(line))
+        ]
+        if matches:
+            line_index, value = matches[-1]
+            final_result_line_indexes.add(line_index)
+            final_results[name] = value
+
     # SIOnline пишет начисления отдельными строками «Имя: +100» / «Имя: -100».
     outcome_patterns = {
-        name: re.compile(rf"^{re.escape(name)}:\s*([+-])(\d+)\s*$")
+        name: re.compile(
+            rf"^{re.escape(name[1:] if name.startswith('Ⓢ') else name)}:\s*([+-])(\d+)\s*$"
+        )
         for name in players
     }
-    for line in lines:
+    current_question: QuestionContext | None = None
+    tracked_question_outcomes = 0
+    for line_index, line in enumerate(lines):
+        if line_index in final_result_line_indexes:
+            continue
+
+        if question_index:
+            theme_name, separator, price_text = line.rpartition(", ")
+            if separator:
+                try:
+                    price = int(price_text)
+                except ValueError:
+                    pass
+                else:
+                    context = question_index.get((theme_name, price))
+                    if context:
+                        current_question = context
+
         for name, pattern in outcome_patterns.items():
             match = pattern.match(line)
             if not match:
                 continue
             sequence += 1
             value = int(match.group(2))
-            raw_outcomes.append(Outcome(sequence, name, value if match.group(1) == "+" else -value))
+            delta = value if match.group(1) == "+" else -value
+            raw_outcomes.append(
+                Outcome(
+                    sequence,
+                    name,
+                    delta,
+                    round_name=current_question.round_name if current_question else None,
+                    theme=current_question.theme if current_question else None,
+                    question_price=current_question.price if current_question else None,
+                )
+            )
+            if current_question:
+                tracked_question_outcomes += 1
             break
 
     _calculate_metrics(players, raw_outcomes)
@@ -330,28 +430,31 @@ def parse_text_log(path: Path, content: str) -> GameData:
             player.min_score = min(0, player.final_score)
             player.max_score = max(0, player.final_score)
 
-    # Финальные строки «Имя: 1234» идут после результатов. Берём последнее
-    # вхождение для каждого уже известного игрока.
-    for name, player in players.items():
-        result_re = re.compile(rf"^{re.escape(name)}:\s*(-?\d+)\s*$")
-        results = [int(match.group(1)) for line in lines if (match := result_re.match(line))]
-        if results:
-            player.final_score = results[-1]
+    for name, final_score in final_results.items():
+        players[name].final_score = final_score
 
-    warnings = [
-        "TXT-журнал SIOnline не содержит тексты PLAYER_ANSWER: ачивки «67» и «Лонгрид» недоступны."
-    ]
+    warnings: list[str] = []
     if not raw_outcomes:
         warnings.append("Нет строк начислений: ачивки на серии и траекторию счёта недоступны.")
+    if question_index is None:
+        warnings.append("SIQ-пакет не найден: ачивки по темам, раундам и номиналам пропущены.")
+    elif raw_outcomes and tracked_question_outcomes == 0:
+        warnings.append("В журнале не распознаны выбранные вопросы; вопросные ачивки пропущены.")
+    elif tracked_question_outcomes < len(raw_outcomes):
+        warnings.append(
+            f"К вопросу привязано {tracked_question_outcomes} из {len(raw_outcomes)} изменений счёта."
+        )
 
     return GameData(source=str(path), players=players, outcomes=raw_outcomes, warnings=warnings)
 
 
-def load_game(path: Path) -> GameData:
+def load_game(path: Path, package_path: Path | None = None) -> GameData:
     content = path.read_text(encoding="utf-8-sig", errors="replace")
     if path.suffix.lower() in {".html", ".htm"} or "data-tag=\"gameInfo\"" in content:
         return parse_html_log(path, content)
-    return parse_text_log(path, content)
+
+    question_index = load_package_questions(package_path) if package_path else None
+    return parse_text_log(path, content, question_index)
 
 
 def _leaders(
@@ -404,11 +507,29 @@ def calculate_awards(game: GameData) -> dict[str, list[Award]]:
         lambda p: f"лучшая точность при ≥{MIN_ACCURACY_ATTEMPTS} попытках: {p.accuracy:.1%}",
     )
     give(
-        _leaders(players, lambda p: p.right_total, eligible=lambda p: p.right_total > 0),
-        "banker",
-        "Банкир",
+        _leaders(
+            players,
+            lambda p: len(p.right_by_theme),
+            eligible=lambda p: bool(p.right_by_theme),
+        ),
+        "polymath",
+        "Широкий кругозор",
         2,
-        lambda p: f"больше всего набрано верными ответами: {p.right_total}",
+        lambda p: f"верные ответы в {len(p.right_by_theme)} разных темах",
+    )
+    give(
+        _leaders(
+            players,
+            lambda p: sum(count for price, count in p.right_by_price.items() if price >= 900),
+            eligible=lambda p: any(price >= 900 for price in p.right_by_price),
+        ),
+        "big_game_hunter",
+        "Охотник на крупняк",
+        2,
+        lambda p: (
+            "верных ответов на вопросы от 900: "
+            f"{sum(count for price, count in p.right_by_price.items() if price >= 900)}"
+        ),
     )
     give(
         [p for p in players if p.min_score <= COMEBACK_FLOOR and p.final_score > 0],
@@ -417,6 +538,24 @@ def calculate_awards(game: GameData) -> dict[str, list[Award]]:
         2,
         lambda p: f"поднялся с {p.min_score} до {p.final_score}",
     )
+
+    # По одному небольшому призу за лидерство в каждом раунде. Порядок берём
+    # из журнала, поэтому схема работает и после перестановки раундов в пакете.
+    round_names = list(dict.fromkeys(
+        outcome.round_name for outcome in game.outcomes if outcome.round_name
+    ))
+    for round_index, round_name in enumerate(round_names, start=1):
+        give(
+            _leaders(
+                players,
+                lambda p, name=round_name: p.right_by_round.get(name, 0),
+                eligible=lambda p, name=round_name: p.right_by_round.get(name, 0) > 0,
+            ),
+            f"round_king_{round_index}",
+            f"Король раунда «{round_name}»",
+            1,
+            lambda p, name=round_name: f"верных ответов в раунде: {p.right_by_round.get(name, 0)}",
+        )
 
     # Рофельные и утешительные — по одной подсказке.
     give(
@@ -460,11 +599,32 @@ def calculate_awards(game: GameData) -> dict[str, list[Award]]:
         lambda p: f"серия из {p.max_wrong_streak} ошибок подряд",
     )
     give(
-        _leaders(players, lambda p: p.answer_67_count, eligible=lambda p: p.answer_67_count > 0),
-        "area_67",
-        "67-й регион",
+        _leaders(
+            players,
+            lambda p: max(p.right_by_theme.values(), default=0),
+            eligible=lambda p: bool(p.right_by_theme),
+        ),
+        "theme_specialist",
+        "Тематический маньяк",
         1,
-        lambda p: f"ответов с отдельным числом 67: {p.answer_67_count}",
+        lambda p: (
+            f"лучший результат в одной теме: {max(p.right_by_theme.values())} "
+            f"({', '.join(name for name, count in p.right_by_theme.items() if count == max(p.right_by_theme.values()))})"
+        ),
+    )
+    give(
+        _leaders(
+            players,
+            lambda p: sum(count for price, count in p.right_by_price.items() if price <= 300),
+            eligible=lambda p: any(price <= 300 for price in p.right_by_price),
+        ),
+        "easy_pickings",
+        "Любитель халявы",
+        1,
+        lambda p: (
+            "верных ответов на вопросы до 300: "
+            f"{sum(count for price, count in p.right_by_price.items() if price <= 300)}"
+        ),
     )
     give(
         [p for p in players if p.returned_to_zero],
@@ -489,25 +649,6 @@ def calculate_awards(game: GameData) -> dict[str, list[Award]]:
             "Последнее слово",
             1,
             f"последний верный ответ (+{last_right.delta})",
-        )
-
-    wrong_with_text = [
-        outcome for outcome in game.outcomes
-        if outcome.delta < 0 and outcome.answer and outcome.answer.strip()
-    ]
-    if wrong_with_text:
-        longest = max(len(outcome.answer.strip()) for outcome in wrong_with_text if outcome.answer)
-        names = {
-            outcome.player
-            for outcome in wrong_with_text
-            if outcome.answer and len(outcome.answer.strip()) == longest
-        }
-        give(
-            [game.players[name] for name in names],
-            "longread",
-            "Лонгрид не помог",
-            1,
-            f"самый длинный неверный ответ: {longest} символов",
         )
 
     give(
@@ -623,6 +764,7 @@ def json_report(game: GameData, awards: dict[str, list[Award]], mapping: dict[st
     return {
         "source": game.source,
         "warnings": game.warnings,
+        "outcomes": [asdict(outcome) for outcome in game.outcomes],
         "players": {
             name: {
                 "metrics": asdict(player),
@@ -651,7 +793,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="JSON соответствий имён SIGame Telegram username/id",
     )
-    parser.add_argument("--json-out", type=Path, help="дополнительно сохранить полный отчёт в JSON")
+    parser.add_argument(
+        "--package",
+        type=Path,
+        help="SIQ-пакет для привязки ответов к темам/раундам (по умолчанию zengame.siq)",
+    )
+    parser.add_argument("--json-out", type=Path, help="сохранить полный отчёт и список ответов в JSON")
     return parser
 
 
@@ -659,7 +806,17 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         path = find_latest_log(args.log)
-        game = load_game(path)
+        package_path = args.package
+        if package_path is None:
+            package_candidates = [
+                Path.cwd() / "zengame.siq",
+                Path(__file__).resolve().parents[1] / "zengame.siq",
+            ]
+            package_path = next((item for item in package_candidates if item.exists()), None)
+        elif not package_path.exists():
+            raise FileNotFoundError(f"SIQ-пакет не найден: {package_path}")
+
+        game = load_game(path, package_path)
         if not game.players:
             raise ValueError("В журнале не найдены игроки.")
         mapping = load_mapping(args.mapping)
@@ -672,7 +829,7 @@ def main(argv: list[str] | None = None) -> int:
                 json.dumps(json_report(game, awards, mapping), ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError, KeyError, json.JSONDecodeError, zipfile.BadZipFile, ET.ParseError) as exc:
         print(f"Ошибка: {exc}", file=sys.stderr)
         return 2
     return 0
