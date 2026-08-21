@@ -109,6 +109,7 @@ class GameData:
     source: str
     players: dict[str, PlayerMetrics]
     outcomes: list[Outcome]
+    round_names: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
 
@@ -517,7 +518,16 @@ def parse_text_log(
             f"К вопросу привязано {tracked_question_outcomes} из {len(raw_outcomes)} изменений счёта."
         )
 
-    return GameData(source=str(path), players=players, outcomes=raw_outcomes, warnings=warnings)
+    round_names = list(dict.fromkeys(
+        context.round_name for context in (question_index or {}).values()
+    ))
+    return GameData(
+        source=str(path),
+        players=players,
+        outcomes=raw_outcomes,
+        round_names=round_names,
+        warnings=warnings,
+    )
 
 
 def load_game(path: Path, package_path: Path | None = None) -> GameData:
@@ -542,6 +552,14 @@ def _leaders(
     values = [value(player) for player in candidates]
     best = max(values) if reverse else min(values)
     return [player for player in candidates if value(player) == best]
+
+
+def _game_round_names(game: GameData) -> list[str]:
+    if game.round_names:
+        return game.round_names
+    return list(dict.fromkeys(
+        outcome.round_name for outcome in game.outcomes if outcome.round_name
+    ))
 
 
 def calculate_awards(game: GameData) -> dict[str, list[Award]]:
@@ -615,11 +633,9 @@ def calculate_awards(game: GameData) -> dict[str, list[Award]]:
         lambda p: f"поднялся с {p.min_score} до {p.final_score}",
     )
 
-    # По одному небольшому призу за лидерство в каждом раунде. Порядок берём
-    # из журнала, поэтому схема работает и после перестановки раундов в пакете.
-    round_names = list(dict.fromkeys(
-        outcome.round_name for outcome in game.outcomes if outcome.round_name
-    ))
+    # По одному небольшому призу за лидерство в каждом раунде. Полный список
+    # берём из SIQ-пакета, а без него восстанавливаем из журнала.
+    round_names = _game_round_names(game)
     for round_index, round_name in enumerate(round_names, start=1):
         give(
             _leaders(
@@ -818,6 +834,29 @@ REPORT_ORDER = {
     "balanced": 320,
 }
 
+# Полный каталог нужен отчёту: ачивка отображается, даже если её никто не получил.
+STATIC_AWARD_CATALOG = (
+    ("champion", "Чемпион", 4),
+    ("erudite", "Главный мозг", 3),
+    ("sniper", "Снайпер", 2),
+    ("polymath", "Широкий кругозор", 2),
+    ("big_game_hunter", "Охотник на крупняк", 2),
+    ("comeback", "Камбэк", 2),
+    ("almost_6767", "Почти 6767", 1),
+    ("professor_minus", "Профессор минусов", 1),
+    ("fifty_fifty", "Монетка 50/50", 1),
+    ("rollercoaster", "Американские горки", 1),
+    ("three_strikes", "Три страйка", 1),
+    ("theme_specialist", "Тематический маньяк", 1),
+    ("easy_pickings", "Любитель халявы", 1),
+    ("reset_zero", "Заводские настройки", 1),
+    ("high_roller", "На все деньги", 1),
+    ("last_word", "Последнее слово", 1),
+    ("bankrupt", "Долговая яма", 1),
+    ("palindrome", "Красивый номер", 1),
+    ("balanced", "Идеальный баланс", 1),
+)
+
 
 def _hint_word(value: int) -> str:
     if value % 10 == 1 and value % 100 != 11:
@@ -828,7 +867,20 @@ def _hint_word(value: int) -> str:
 
 
 def render_report(game: GameData, awards: dict[str, list[Award]]) -> str:
-    grouped: dict[tuple[str, str, int], list[tuple[str, str]]] = {}
+    grouped: dict[tuple[str, str, int], list[tuple[str, str]]] = {
+        definition: [] for definition in STATIC_AWARD_CATALOG
+    }
+
+    # Раундовые ачивки динамические: выводим отдельную для каждого раунда пакета,
+    # даже если в журнале нет победителя или изменений счёта этого раунда.
+    round_names = _game_round_names(game)
+    for round_index, round_name in enumerate(round_names, start=1):
+        grouped[(
+            f"round_king_{round_index}",
+            f"Король раунда «{round_name}»",
+            1,
+        )] = []
+
     for player_name, player_awards in awards.items():
         for award in player_awards:
             key = (award.code, award.title, award.points)
@@ -836,7 +888,9 @@ def render_report(game: GameData, awards: dict[str, list[Award]]) -> str:
 
     def award_order(item: tuple[tuple[str, str, int], list[tuple[str, str]]]) -> tuple[int, str]:
         code, title, _ = item[0]
-        return (100 if code.startswith("round_king_") else REPORT_ORDER.get(code, 999), title)
+        if code.startswith("round_king_"):
+            return (100 + int(code.rsplit("_", 1)[1]), title)
+        return (REPORT_ORDER.get(code, 999), title)
 
     lines = [
         "АЧИВКИ SIGAME",
@@ -849,8 +903,11 @@ def render_report(game: GameData, awards: dict[str, list[Award]]) -> str:
         start=1,
     ):
         lines.append(f"{number}. {title} — {points} {_hint_word(points)}")
-        for player_name, evidence in recipients:
-            lines.append(f"   {player_name} — {evidence}")
+        if recipients:
+            for player_name, evidence in recipients:
+                lines.append(f"   {player_name} — {evidence}")
+        else:
+            lines.append("   Никто не получил")
         lines.append("")
 
     lines.append("ИТОГО К НАЧИСЛЕНИЮ")
