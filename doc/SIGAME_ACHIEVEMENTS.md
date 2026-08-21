@@ -32,40 +32,30 @@
 3. HTML-журнал лежит в
    `%LOCALAPPDATA%\Khil-soft\SIGame\Logs\<имя>\*_log.html`.
 
-### Начисление
+### Создание отчёта
 
-1. Создай соответствие игровых имён Telegram-аккаунтам:
-
-   ```powershell
-   copy tools\players.example.json players.json
-   notepad players.json
-   ```
-
-2. Запусти из корня проекта:
-
-   ```powershell
-   python tools\sigame_achievements.py --map players.json
-   ```
-
-   Без пути скрипт сам возьмёт самый свежий Steam TXT или классический HTML. Можно
-   указать файл/папку явно:
-
-   ```powershell
-   python tools\sigame_achievements.py "C:\path\game-log.txt" --map players.json
-   ```
-
-3. Отправь напечатанные команды боту от аккаунта ведущего, например:
-
-   ```text
-   /addhint @kolya 7
-   /addhint @masha 4
-   ```
-
-Полный машиночитаемый отчёт, включая список `игрок → раунд → тема → номинал → результат`:
+Запусти из корня проекта:
 
 ```powershell
-python tools\sigame_achievements.py game-log.txt --map players.json --json-out awards.json
+python tools\sigame_achievements.py
 ```
+
+Скрипт сам найдёт последний Steam-журнал. Можно передать конкретный файл:
+
+```powershell
+python tools\sigame_achievements.py "C:\path\game-log.txt"
+```
+
+Никаких дополнительных флагов или файлов соответствий не требуется. Скрипт ничего
+не печатает в консоль и создаёт рядом с журналом файл:
+
+```text
+game-log-2026-08-21T15-54-02-achievements.txt
+```
+
+В нём сначала перечислены только сработавшие ачивки и получившие их игроки, а в
+конце — итоговое количество подсказок для каждого игрового имени. Ведущий начисляет
+эти суммы игрокам через `/addhint`.
 
 ## Набор ачивок
 
@@ -135,7 +125,7 @@ Steam-журнала достаточно — вручную записыват�
 3. итоговый `GAME_STATISTICS` с числом верных и неверных ответов.
 
 Скрипт дополнительно читает структуру `zengame.siq`, поэтому знает, к какому раунду
-относится тема. В `awards.json` сохраняется восстановленная лента всех ответов.
+относится тема. Вручную сопоставлять вопросы и игроков не требуется.
 
 ### Известные ограничения
 

@@ -12,14 +12,13 @@ from __future__ import annotations
 
 import argparse
 import html
-import json
 import os
 import re
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
 from collections import defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Iterable
@@ -515,7 +514,11 @@ def calculate_awards(game: GameData) -> dict[str, list[Award]]:
         "polymath",
         "Широкий кругозор",
         2,
-        lambda p: f"верные ответы в {len(p.right_by_theme)} разных темах",
+        lambda p: (
+            "верные ответы в 1 теме"
+            if len(p.right_by_theme) == 1
+            else f"верные ответы в {len(p.right_by_theme)} разных темах"
+        ),
     )
     give(
         _leaders(
@@ -706,7 +709,9 @@ def find_latest_log(path: Path | None) -> Path:
         elif base.exists():
             candidates.extend(
                 item for item in base.rglob("*")
-                if item.is_file() and item.suffix.lower() in {".html", ".htm", ".txt"}
+                if item.is_file()
+                and item.suffix.lower() in {".html", ".htm", ".txt"}
+                and not item.name.endswith("-achievements.txt")
             )
 
     if not candidates:
@@ -715,90 +720,89 @@ def find_latest_log(path: Path | None) -> Path:
     return max(candidates, key=lambda item: item.stat().st_mtime)
 
 
-def load_mapping(path: Path | None) -> dict[str, str]:
-    if path is None:
-        return {}
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError("Файл соответствий должен быть JSON-объектом {\"Имя SIGame\": \"@telegram\"}.")
-    return {str(key): str(value) for key, value in raw.items()}
+REPORT_ORDER = {
+    "champion": 10,
+    "erudite": 20,
+    "sniper": 30,
+    "polymath": 40,
+    "big_game_hunter": 50,
+    "comeback": 60,
+    "almost_6767": 200,
+    "professor_minus": 210,
+    "fifty_fifty": 220,
+    "rollercoaster": 230,
+    "three_strikes": 240,
+    "theme_specialist": 250,
+    "easy_pickings": 260,
+    "reset_zero": 270,
+    "high_roller": 280,
+    "last_word": 290,
+    "bankrupt": 300,
+    "palindrome": 310,
+    "balanced": 320,
+}
 
 
-def render_report(game: GameData, awards: dict[str, list[Award]], mapping: dict[str, str]) -> str:
-    lines = [f"Источник: {game.source}", "", "Статистика:"]
-    for player in game.players.values():
-        accuracy = f"{player.accuracy:.1%}" if player.accuracy is not None else "—"
-        lines.append(
-            f"  {player.name}: счёт {player.final_score}; ✓ {player.right_count}; "
-            f"✗ {player.wrong_count}; точность {accuracy}"
-        )
+def _hint_word(value: int) -> str:
+    if value % 10 == 1 and value % 100 != 11:
+        return "подсказка"
+    if value % 10 in (2, 3, 4) and value % 100 not in (12, 13, 14):
+        return "подсказки"
+    return "подсказок"
 
-    lines.extend(["", "Ачивки и подсказки:"])
-    for name, player_awards in awards.items():
-        total = sum(award.points for award in player_awards)
-        lines.append(f"  {name} — {total}")
+
+def render_report(game: GameData, awards: dict[str, list[Award]]) -> str:
+    grouped: dict[tuple[str, str, int], list[tuple[str, str]]] = {}
+    for player_name, player_awards in awards.items():
         for award in player_awards:
-            lines.append(f"    +{award.points} {award.title} — {award.evidence}")
+            key = (award.code, award.title, award.points)
+            grouped.setdefault(key, []).append((player_name, award.evidence))
+
+    def award_order(item: tuple[tuple[str, str, int], list[tuple[str, str]]]) -> tuple[int, str]:
+        code, title, _ = item[0]
+        return (100 if code.startswith("round_king_") else REPORT_ORDER.get(code, 999), title)
+
+    lines = [
+        "АЧИВКИ SIGAME",
+        f"Источник: {Path(game.source).name}",
+        "",
+    ]
+
+    for number, ((_, title, points), recipients) in enumerate(
+        sorted(grouped.items(), key=award_order),
+        start=1,
+    ):
+        lines.append(f"{number}. {title} — {points} {_hint_word(points)}")
+        for player_name, evidence in recipients:
+            lines.append(f"   {player_name} — {evidence}")
+        lines.append("")
+
+    lines.append("ИТОГО К НАЧИСЛЕНИЮ")
+    for player_name, player_awards in awards.items():
+        total = sum(award.points for award in player_awards)
+        lines.append(f"{player_name} — {total} {_hint_word(total)}")
 
     if game.warnings:
-        lines.extend(["", "Предупреждения:"])
-        lines.extend(f"  ! {warning}" for warning in game.warnings)
+        lines.extend(["", "ПРЕДУПРЕЖДЕНИЯ"])
+        lines.extend(f"- {warning}" for warning in game.warnings)
 
-    lines.extend(["", "Команды для Telegram-бота:"])
-    for name, player_awards in awards.items():
-        total = sum(award.points for award in player_awards)
-        target = mapping.get(name)
-        if total <= 0:
-            continue
-        if target:
-            if not target.startswith("@") and not target.isdigit():
-                target = "@" + target
-            lines.append(f"  /addhint {target} {total}")
-        else:
-            lines.append(f"  # {name}: +{total} (добавь соответствие SIGame → Telegram)")
-
-    return "\n".join(lines)
+    return "\n".join(lines).rstrip() + "\n"
 
 
-def json_report(game: GameData, awards: dict[str, list[Award]], mapping: dict[str, str]) -> dict:
-    return {
-        "source": game.source,
-        "warnings": game.warnings,
-        "outcomes": [asdict(outcome) for outcome in game.outcomes],
-        "players": {
-            name: {
-                "metrics": asdict(player),
-                "awards": [asdict(award) for award in awards[name]],
-                "hint_total": sum(award.points for award in awards[name]),
-                "telegram": mapping.get(name),
-            }
-            for name, player in game.players.items()
-        },
-    }
+def report_path_for(log_path: Path) -> Path:
+    return log_path.with_name(f"{log_path.stem}-achievements.txt")
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Считает ачивки и подсказки по журналу SIGame/SIOnline."
+        description="Создаёт TXT-отчёт с ачивками по журналу SIGame/Steam."
     )
     parser.add_argument(
         "log",
         nargs="?",
         type=Path,
-        help="HTML/TXT-журнал или папка с журналами; без аргумента ищется последний лог SIGame",
+        help="журнал или папка; без аргумента берётся последний журнал Steam",
     )
-    parser.add_argument(
-        "--map",
-        dest="mapping",
-        type=Path,
-        help="JSON соответствий имён SIGame Telegram username/id",
-    )
-    parser.add_argument(
-        "--package",
-        type=Path,
-        help="SIQ-пакет для привязки ответов к темам/раундам (по умолчанию zengame.siq)",
-    )
-    parser.add_argument("--json-out", type=Path, help="сохранить полный отчёт и список ответов в JSON")
     return parser
 
 
@@ -806,30 +810,20 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         path = find_latest_log(args.log)
-        package_path = args.package
-        if package_path is None:
-            package_candidates = [
-                Path.cwd() / "zengame.siq",
-                Path(__file__).resolve().parents[1] / "zengame.siq",
-            ]
-            package_path = next((item for item in package_candidates if item.exists()), None)
-        elif not package_path.exists():
-            raise FileNotFoundError(f"SIQ-пакет не найден: {package_path}")
+        package_candidates = [
+            Path.cwd() / "zengame.siq",
+            Path(__file__).resolve().parents[1] / "zengame.siq",
+        ]
+        package_path = next((item for item in package_candidates if item.exists()), None)
 
         game = load_game(path, package_path)
         if not game.players:
             raise ValueError("В журнале не найдены игроки.")
-        mapping = load_mapping(args.mapping)
+
         awards = calculate_awards(game)
-        report = render_report(game, awards, mapping)
-        print(report)
-        if args.json_out:
-            args.json_out.parent.mkdir(parents=True, exist_ok=True)
-            args.json_out.write_text(
-                json.dumps(json_report(game, awards, mapping), ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-    except (OSError, ValueError, KeyError, json.JSONDecodeError, zipfile.BadZipFile, ET.ParseError) as exc:
+        output_path = report_path_for(path)
+        output_path.write_text(render_report(game, awards), encoding="utf-8")
+    except (OSError, ValueError, KeyError, zipfile.BadZipFile, ET.ParseError) as exc:
         print(f"Ошибка: {exc}", file=sys.stderr)
         return 2
     return 0

@@ -1,6 +1,8 @@
+import io
 import os
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -9,8 +11,10 @@ from tools.sigame_achievements import (
     calculate_awards,
     find_latest_log,
     load_package_questions,
+    main,
     parse_html_log,
     parse_text_log,
+    report_path_for,
 )
 
 
@@ -73,6 +77,32 @@ Player B: -500
         self.assertIn("big_game_hunter", player_a_codes)
         self.assertIn("round_king_1", player_a_codes)
 
+    def test_main_only_creates_txt_report(self):
+        content = """🎬 Кинчик, 100
+Alice: +100
+Game results
+Alice: 100
+Game statistics:
+Alice: Right: 1/100, Wrong: 0/0
+"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "game-log-test.txt"
+            log_path.write_text(content, encoding="utf-8")
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                self.assertEqual(main([str(log_path)]), 0)
+
+            output_path = report_path_for(log_path)
+            self.assertTrue(output_path.exists())
+            self.assertEqual(stdout.getvalue(), "")
+            report = output_path.read_text(encoding="utf-8")
+            self.assertIn("АЧИВКИ SIGAME", report)
+            self.assertIn("Чемпион", report)
+            self.assertIn("ИТОГО К НАЧИСЛЕНИЮ", report)
+            self.assertIn("Alice —", report)
+            self.assertNotIn("/addhint", report)
+
     def test_loads_question_context_from_package(self):
         index = load_package_questions(Path("zengame.siq"))
         context = index[("🎬 Кинчик", 100)]
@@ -84,6 +114,7 @@ Player B: -500
             logs_dir.mkdir(parents=True)
             steam_log = logs_dir / "game-log-2026-08-21.txt"
             steam_log.write_text("test", encoding="utf-8")
+            report_path_for(steam_log).write_text("newer generated report", encoding="utf-8")
 
             with patch.dict(os.environ, {"LOCALAPPDATA": temp_dir}):
                 self.assertEqual(find_latest_log(None), steam_log)
