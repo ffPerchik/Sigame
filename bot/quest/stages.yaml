@@ -9,7 +9,6 @@ entry_code: "ARGUS1001"
 welcome:
   text: |
     Привет. Это Женя.
-
     Если ты это читаешь, то ты добрался до квеста, молодец!!!
 
 
@@ -26,13 +25,14 @@ stages:
 
   z_1:
     mode: auto
-    text: |
-      Это мой первый опыт, я очень старался, да, сначала будет просто, но мы разгонемся, обещаю!!!
+    messages:
+      - text: |
+          Это мой первый опыт, я очень старался, да, сначала будет просто, но мы разгонемся, обещаю!!!
+          Ну что же, давай начнём
 
-      Ну что же, давай начнём:
-
-      +1 без Ё:
-      РСЙГЖУ
+      - text: |
+          +1 без Ё:
+          РСЙГЖУ
     accept:
       - "ПРИВЕТ"
       - "привет"
@@ -51,6 +51,7 @@ stages:
 
   z_2:
     mode: auto
+    delay: 3
     text: |
       ээ-м... это не я писал... лаг какой-то... Да ладно, неважно
 
@@ -66,31 +67,18 @@ stages:
     mode: info
     messages:
       - {speaker: argus, delay: 0.5, text: "HANDSHAKE PROGRESS: 25%"}
-      - {speaker: argus, delay: 0.5, text: "ROUTING TRAFFIC THROUGH RELAY NODES"}
       - {speaker: argus, delay: 0.5, text: "TARGET GATEWAY DETECTED"}
       - {speaker: argus, delay: 0.5, text: "AUTHORIZATION STATUS: UNKNOWN"}
-      - {speaker: argus, delay: 0.5, text: "ACCESS REQUEST PENDING…"}
-      - {speaker: argus, delay: 0.5, text: "SESSION TOKEN ACQUIRED"}
       - {speaker: argus, delay: 0.5, text: "ENCRYPTED CHANNEL: ONLINE"}
-      - {speaker: argus, delay: 0.5, text: "НЕ ОТВЕЧАЙ ЖЕНЕ. ОН БОЛЬШЕ НЕ КОНТРОЛИРУЕТ МАРШРУТ."}
     next: z_3
 
   z_3:
     mode: info
     text: |
-      Чё, какой 25? 25% чего? Какой к чёрту канал, ты тоже видишь эти сообщения? 
+      Чё, какой 25? 25% чего? Какой к чёрту канал? Ты тоже видишь эти сообщения? 
       Я сейчас перезапущу бота. подожди, вот ещё одна задачка, пока перезапускается.
 
-    document: z_3.png
-    next: bot_1
-
-  bot_1:
-    mode: auto
-    text: |
-      🤖 Бот @Zengame_checker_bot запущен. HOST=Женя. Жду команд.
-    accept:
-      - "zengame"
-      - "ZENGAME"
+    document: z_3.png -c
     hint: |
       Да, надо просто прочитать, что скрыто на картинке.
     next: a_3
@@ -99,81 +87,54 @@ stages:
     mode: info
     messages:
       - {speaker: argus, delay: 0.5, text: "CHANNEL INJECTION: 50%"}
-      - {speaker: argus, delay: 0.5, text: "INTERNAL NETWORK MAP LOADED"}
-      - {speaker: argus, delay: 0.5, text: "WARNING: UNUSUAL ACTIVITY DETECTED"}
-      - {speaker: argus, delay: 0.5, text: "COUNTERMEASURES INITIALIZING"}
-      - {speaker: argus, delay: 0.5, text: "HOST PROCESS «ЖЕНЯ» IS ATTEMPTING RESTART"}
+      - {speaker: argus, delay: 0.5, text: "*WARNING*: UNUSUAL ACTIVITY DETECTED"}
+      - {speaker: argus, delay: 0.5, text: "HOST PROCESS «kolysheev» IS ATTEMPTING RESTART"}
       - {speaker: argus, delay: 0.5, text: "RESTART REQUEST: DENIED"}
-      - {speaker: argus, delay: 0.5, text: "ПЕРЕЗАПУСК НИЧЕГО НЕ ИЗМЕНИТ. МЫ УЖЕ ВНУТРИ."}
+    next: bot_1
+
+  bot_1:
+    mode: auto
+    delay: 10
+    text: |
+      🤖 Бот @Zengame_checker_bot запущен. HOST=k@ly$%ev. Жду команд.
+    accept:
+      - "zengame"
+      - "ZENGAME"
+    hint: |
+      Да, надо просто прочитать, что скрыто на картинке.
     next: z_fix50
 
-  z_fix50:
+  z_4:
     mode: info
     text: |
-      Женя: я откатываю апдейт, не пишите в чат что «взлом». это баг.
-      Цезарь снова, сдвиг +1: ТУБСУ
-    next: z_c3
-
-  z_c3:
-    mode: auto
-    text: |
-      Слово.
+      Я откатываю апдейт, не пишите в чат что это «взлом». Просто баг. Просто баг, Женя... Просто баг...
     accept:
-      - "СТАРТ"
-      - "старт"
+      - "взлом"
+      - "взлом"
     hint: |
-      На одну назад: Т→С, У→Т, Б→А, С→Р, У→Т.
-    next: z_p75
+      Просто напиши «взлом»
+    next: z_a_final
 
-  z_p75:
+  z_a_final:
     mode: info
     messages:
       - {speaker: argus, delay: 0.5, text: "CHANNEL OVERWRITE: 75%"}
-      - {speaker: argus, delay: 0.5, text: "RE-ROUTING CONNECTION…"}
       - {speaker: argus, delay: 0.5, text: "CONNECTION STABILIZED"}
-      - {speaker: argus, delay: 0.5, text: "MIRROR DATA STREAM: 18% COMPLETE"}
-      - {speaker: argus, delay: 0.5, text: "MIRROR DATA STREAM: 47% COMPLETE"}
-      - {speaker: argus, delay: 0.5, text: "ЖЕНЯ. ОТОЙДИ ОТ КАНАЛА."}
-    next: z_fix75
-
-  z_fix75:
-    mode: info
-    text: |
-      Женя: отойти от какого канала. это мой бот.
-
-      Ладно, последняя школьная. Морзе: -.. .-
-    next: z_morse_easy
-
-  z_morse_easy:
-    mode: auto
-    text: |
-      Две буквы. Точка-тире, не надо Audacity.
-    accept:
-      - "ДА"
-      - "да"
-    hint: |
-      Д = -..   А = .-
-    next: z_p100
-
-  z_p100:
-    mode: info
-    messages:
-      - {speaker: argus, delay: 0.5, text: "MIRROR DATA STREAM: 83% COMPLETE"}
       - {speaker: argus, delay: 0.5, text: "TRANSFER COMPLETE"}
       - {speaker: argus, delay: 0.5, text: "CHANNEL OVERWRITE: 100%"}
       - {speaker: argus, delay: 0.5, text: "ПЕРЕДАЧА ПЕРЕХВАЧЕНА"}
       - {speaker: argus, delay: 0.5, text: "ИГРОК, НЕ ЗАКРЫВАЙ СОЕДИНЕНИЕ. ОСТАЛСЯ ОДИН ШАГ."}
+      - {delay: 0.5, text: "Женя: нет нет нет подож—"}
+      - {speaker: argus, delay: 0.5, text: "TERMINATING HOST SESSION…"}
+      - {speaker: argus, delay: 0.5, text: "TRACE STATUS: CLEAR"}
+      - {speaker: argus, delay: 0.5, text: "CONNECTION OWNER: ARGVS-1001"}
+      - {speaker: argus, delay: 0.5, text: "ЖЕНЯ БОЛЬШЕ НЕ ВЕДЁТ ЭТУ ЛИНИЮ"}
     next: z_hack
 
   z_hack:
     mode: info
     messages:
-      - text: "Женя: нет нет нет подож—"
-        delay: 0.5
-      - {speaker: argus, delay: 0.5, text: "TERMINATING HOST SESSION…"}
-      - {speaker: argus, delay: 0.5, text: "TRACE STATUS: CLEAR"}
-      - {speaker: argus, delay: 0.5, text: "CONNECTION OWNER: ARGVS-1001"}
-      - {speaker: argus, delay: 0.5, text: "ЖЕНЯ БОЛЬШЕ НЕ ВЕДЁТ ЭТУ ЛИНИЮ"}
+
       - delay: 0.5
         text: |
           ┌────────────────────────────────────────────────────────────────┐
