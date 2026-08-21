@@ -9,3 +9,7 @@ bot/.env
 bot/quest.db
 bot/qr/
 bot/__pycache__/
+
+# local achievement mapping / generated report
+/players.json
+/awards.json
