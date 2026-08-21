@@ -2,15 +2,35 @@
 # Уличная точка: у стадии qr: true и accept: ["КОД"], затем python bot/make_qr.py
 entry_code: "ARGUS1001"
 
+# [23:41:07] NETWORK INTERFACE: ACTIVE
+# [23:41:09] ESTABLISHING SECURE HANDSHAKE...
+# [23:41:11] HANDSHAKE ACCEPTED
+# [23:41:14] ROUTING TRAFFIC THROUGH RELAY NODES
+# [23:41:18] TARGET GATEWAY DETECTED
+# [23:41:21] AUTHORIZATION STATUS: UNKNOWN
+# [23:41:26] ACCESS REQUEST PENDING...
+# [23:41:31] SESSION TOKEN ACQUIRED
+# [23:41:33] ENCRYPTED CHANNEL: ONLINE
+# [23:41:37] INTERNAL NETWORK MAP LOADED
+# [23:41:42] WARNING: UNUSUAL ACTIVITY DETECTED
+# [23:41:45] COUNTERMEASURES INITIALIZING
+# [23:41:49] RE-Routing CONNECTION...
+# [23:41:54] CONNECTION STABILIZED
+# [23:41:58] DATA STREAM: 18% COMPLETE
+# [23:42:06] DATA STREAM: 47% COMPLETE
+# [23:42:13] DATA STREAM: 83% COMPLETE
+# [23:42:17] TRANSFER COMPLETE
+# [23:42:19] TERMINATING SESSION...
+# [23:42:22] TRACE STATUS: CLEAR
+# [23:42:25] CONNECTION CLOSED
+
 welcome:
   text: |
     Привет. Это Женя.
 
-    Если ты это читаешь — финал «Своей игры» уже позади, пакет расковырял,
-    и вот ты в боте. Я думал, он будет просто чекером: прошёл раунд — галочка.
-    Без аргов. Честно. Ну почти.
+    Если ты это читаешь, то ты добрался до квеста, молодец!!!
 
-    Сейчас подожди. Запущу всех разом, чтобы никто не ускакал вперёд.
+
 
 nodes:
   N1: {label: "СЛОИ СНИМКА", hint: "надпись · файл · хвост"}
@@ -27,88 +47,87 @@ stages:
     text: |
       Ок, ты на месте. Жди, пока я подтвержу старт всем сразу.
 
-  z_hello:
+  z_1:
     mode: info
     text: |
-      Ладно. Zengame — это пак плюс бот-чекер. Никаких аргов, я вообще
-      не в этом. Чтобы не было скучно, я накидал самых простых шифров,
-      какие вспомнил со школы. Один шифр — один ответ. Даже подсказка
-      не нужна, но ладно, она есть.
+      Это мой первый опыт, я очень старался, да, сначала будет просто, но мы разгонемся, обещаю!!!
 
-      Первая: шифр Цезаря, сдвиг +1 по русскому алфавиту без Ё.
-      Шифртекст: РСЙГЖУ
-    next: z_c1
+      Ну что же, давай начнём:
 
-  z_c1:
-    mode: auto
-    text: |
-      Ну. Что получилось?
+      +1 без Ё:
+      РСЙГЖУ
     accept:
       - "ПРИВЕТ"
       - "привет"
     hint: |
       Каждую букву сдвинь на одну назад. Р→П, С→Р, Й→И, Г→В, Ж→Е, У→Т.
-    next: z_hear
+    next: a_hear    
 
-  z_hear:
+  a_1:
     mode: info
     text: |
-      …вы слышите нас?
+      [23:41:07] NETWORK INTERFACE: ACTIVE
+      [23:41:09] ESTABLISHING SECURE HANDSHAKE...
+      [23:41:11] HANDSHAKE ACCEPTED
 
+      …вы слышите нас?
+      .
+      .
       .
     next: z_c2
 
-  z_c2:
+  z_2:
     mode: info
     text: |
-      Женя: ээ. это не я писал. лаг какой-то. неважно.
+      ээ-м... это не я писал... лаг какой-то... Да ладно, неважно
 
-      Вторая загадка, ещё скучнее. А=1, Б=2, … Числа: 4-1
-    next: z_a26
-
-  z_a26:
-    mode: auto
-    text: |
-      Две буквы.
+      Уже что-то поинтереснее: 17-6-18-25-10-12
     accept:
-      - "ДА"
-      - "да"
+      - "перчик"
+      - "ПЕРЧИК"
     hint: |
-      4=Д, 1=А.
-    next: z_p25
+      числа в буквы, номер в алфавите
+    next: a_2
 
-  z_p25:
+  a_2:
     mode: info
     text: |
       ARGVS // handshake 25%
-      канал нестабилен
-    next: z_fix25
+      [23:41:14] ROUTING TRAFFIC THROUGH RELAY NODES
+      [23:41:18] TARGET GATEWAY DETECTED
+      [23:41:21] AUTHORIZATION STATUS: UNKNOWN
+      [23:41:26] ACCESS REQUEST PENDING...
+      [23:41:31] SESSION TOKEN ACQUIRED
+      [23:41:33] ENCRYPTED CHANNEL: ONLINE
+      ...
+      ....канал нестабилен
+    next: z_3
 
-  z_fix25:
+  z_3:
     mode: info
     text: |
-      Женя: 25% чего. я сейчас перезапущу бота. подожди, вот ещё одна,
-      пока крутится.
+      Чё, какой 25? 25% чего? Какой к чёрту канал, ты тоже видишь эти сообщения? 
+      Я сейчас перезапущу бота. подожди, вот ещё одна задачка, пока перезапускается.
 
-      Слово задом наперёд: ТОК
-    next: z_rev
+    document: z_3.png
+    next: bot_1
 
-  z_rev:
+  bot_1:
     mode: auto
     text: |
-      Переверни.
+      🤖 Бот @Zengame_checker_bot запущен. HOST=Женя. Жду команд.
     accept:
-      - "КОТ"
-      - "кот"
+      - "zengame"
+      - "ZENGAME"
     hint: |
-      ТОК → КОТ. Серьёзно.
-    next: z_p50
+      Да, надо просто прочитать, что скрыто на картинке.
+    next: a_3
 
-  z_p50:
+  a_3:
     mode: info
     text: |
       ARGVS // inject 50%
-      вы слышите нас
+      
     next: z_fix50
 
   z_fix50:
