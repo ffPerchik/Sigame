@@ -18,12 +18,14 @@ try:  # `python -m bot.bot`
     from . import config as cfg
     from . import db, quest
     from . import texts as T
+    from .media_spec import delivery_field, parse_media_spec
     from .timed_messages import send_messages as send_timed_messages, wait_before
 except ImportError:  # `python bot/bot.py` или запуск из папки bot
     import config as cfg
     import db
     import quest
     import texts as T
+    from media_spec import delivery_field, parse_media_spec
     from timed_messages import send_messages as send_timed_messages, wait_before
 
 BASE = Path(__file__).resolve().parent
@@ -109,16 +111,24 @@ async def send_stage(uid: int, stage_id: str) -> None:
         # `delay` относится только к следующему обычному сообщению/медиа стадии
         # и всегда отрабатывает ДО него, никогда после.
         await wait_before(st.get("delay", 0.0))
-    for field, sender, kind_label in (
-        ("image",    bot.send_photo,    "photo"),
-        ("audio",    bot.send_audio,    "audio"),
-        ("video",    bot.send_video,    "video"),
-        ("document", bot.send_document, "document"),
-    ):
-        fn = st.get(field)
-        if not fn:
+    media_senders = {
+        "image": (bot.send_photo, "photo"),
+        "audio": (bot.send_audio, "audio"),
+        "video": (bot.send_video, "video"),
+        "document": (bot.send_document, "document"),
+    }
+    for field in ("image", "audio", "video", "document"):
+        raw_reference = st.get(field)
+        if not raw_reference:
             continue
-        path = Path(fn) if Path(fn).is_absolute() else media_dir / fn
+        try:
+            spec = parse_media_spec(raw_reference)
+            actual_field = delivery_field(field, spec)
+        except ValueError as e:
+            print(T.MEDIA_SPEC_FAIL.format(field=field, value=raw_reference, err=e))
+            continue
+        sender, kind_label = media_senders[actual_field]
+        path = Path(spec.path) if Path(spec.path).is_absolute() else media_dir / spec.path
         try:
             await sender(uid, FSInputFile(path), caption=text)
             return
