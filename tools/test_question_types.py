@@ -45,6 +45,40 @@ class QuestionTypesTests(unittest.TestCase):
             for type_name in SPECIAL_TYPES:
                 self.assertGreater(counts[type_name], 0, f"{round_name}: {type_name}")
 
+    def test_special_questions_are_not_always_last_in_theme(self):
+        root = load_root()
+        for round_element in root.find(q("rounds")).findall(q("round")):
+            round_name = round_element.get("name", "")
+            if round_name in EXCLUDED_ROUNDS or round_element.get("type") == "final":
+                continue
+            special_questions = []
+            last_questions = set()
+            for theme in round_element.iter(q("theme")):
+                theme_questions = list(theme.iter(q("question")))
+                if theme_questions:
+                    last_questions.add(id(theme_questions[-1]))
+                special_questions.extend(
+                    question
+                    for question in theme_questions
+                    if question_type(question) in SPECIAL_TYPES
+                )
+            self.assertTrue(
+                any(id(question) not in last_questions for question in special_questions),
+                f"В раунде «{round_name}» все спецтипы стоят последними",
+            )
+
+    def test_seed_is_reproducible_and_changeable(self):
+        first = load_root()
+        second = load_root()
+        third = load_root()
+        assignment_a = apply_question_types(first, seed=12345)
+        assignment_b = apply_question_types(second, seed=12345)
+        assignment_c = apply_question_types(third, seed=54321)
+        self.assertEqual(assignment_a, assignment_b)
+        self.assertNotEqual(assignment_a, assignment_c)
+        apply_question_types(first, seed=12345)
+        self.assertEqual(ET.tostring(first), ET.tostring(second))
+
     def test_excluded_and_final_rounds_are_not_touched(self):
         root = load_root()
         protected = {

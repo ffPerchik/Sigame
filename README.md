@@ -43,6 +43,8 @@ python3 tools/assign_question_types.py  # только обновить типы
 
 Состав раундов и переименование тем — `ROUND_PLAN` и `RENAME` в `tools/build_v5.py`.
 Распределение спецтипов — `SPECIAL_TYPES` в `tools/assign_question_types.py`.
+Вопрос внутри темы выбирается псевдослучайно; другой вариант можно получить через
+`python3 tools/assign_question_types.py --seed 12345`.
 
 ## Квест: как найти старт
 

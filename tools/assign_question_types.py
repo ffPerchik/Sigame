@@ -3,12 +3,14 @@
 
 В каждом обычном раунде остаются простые вопросы и добавляется минимум по одному:
 stake, secret, secretPublicPrice, secretNoQuestion, noRisk, forAll и stakeAll.
+Конкретный вопрос внутри темы выбирается псевдослучайно и воспроизводимо по seed.
 Раунд «Не спиздил, а адаптировал» и финальный раунд не изменяются.
 """
 from __future__ import annotations
 
 import argparse
 import math
+import random
 import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
@@ -29,6 +31,7 @@ SPECIAL_TYPES = (
 )
 SECRET_TYPES = {"secret", "secretPublicPrice", "secretNoQuestion"}
 XML_FILES = {"content.xml", "[Content].xml"}
+DEFAULT_SEED = 6767
 
 
 def q(tag: str) -> str:
@@ -96,28 +99,6 @@ def _number_set_param(minimum: int, maximum: int, step: int) -> ET.Element:
     return element
 
 
-def _ensure_secret_parameters(
-    question: ET.Element,
-    type_name: str,
-    theme_name: str,
-    price_range: tuple[int, int, int],
-) -> None:
-    params = question.find(q("params"))
-    if params is None:
-        params = ET.Element(q("params"))
-        question.insert(0, params)
-    names = {param.get("name") for param in params.findall(q("param"))}
-    minimum, maximum, step = price_range
-    missing = []
-    if type_name != "secretNoQuestion" and "theme" not in names:
-        missing.append(_simple_param("theme", theme_name))
-    if "price" not in names:
-        missing.append(_number_set_param(minimum, maximum, step))
-    if "selectionMode" not in names:
-        missing.append(_simple_param("selectionMode", "exceptCurrent"))
-    _prepend_params(params, missing)
-
-
 def set_question_type(
     question: ET.Element,
     type_name: str,
@@ -147,8 +128,23 @@ def set_question_type(
     _prepend_params(params, secret_params)
 
 
-def apply_question_types(root: ET.Element) -> dict[str, dict[str, tuple[str, int]]]:
-    """Изменяет XML и возвращает {раунд: {тип: (тема, цена)}}."""
+def _reset_special_type(question: ET.Element) -> None:
+    """Сбрасывает ранее назначенный спецтип, не затрагивая тело и ответ."""
+    if question_type(question) not in SPECIAL_TYPES:
+        return
+    question.attrib.pop("type", None)
+    params = question.find(q("params"))
+    if params is None:
+        return
+    for parameter_name in ("theme", "price", "selectionMode"):
+        _remove_param(params, parameter_name)
+
+
+def apply_question_types(
+    root: ET.Element,
+    seed: int = DEFAULT_SEED,
+) -> dict[str, dict[str, tuple[str, int]]]:
+    """Псевдослучайно назначает типы и возвращает {раунд: {тип: (тема, цена)}}."""
     assignments: dict[str, dict[str, tuple[str, int]]] = {}
     rounds = root.find(q("rounds"))
     if rounds is None:
@@ -172,31 +168,31 @@ def apply_question_types(root: ET.Element) -> dict[str, dict[str, tuple[str, int
         round_assignments: dict[str, tuple[str, int]] = {}
         theme_count = len(theme_questions)
 
-        # Первый проход берёт последний вопрос каждой темы, второй — предпоследний.
-        # Так спецвопросы распределены по темам, а не собраны в одном месте.
+        # Сначала убираем прошлую автогенерацию, иначе при повторном запуске
+        # спецтипы будут накапливаться на старых и новых позициях.
+        for _, questions in theme_questions:
+            for question in questions:
+                _reset_special_type(question)
+
+        # Типы распределяются по темам циклически, а конкретный вопрос внутри
+        # каждой темы выбирается псевдослучайно. Фиксированный seed делает сборку
+        # воспроизводимой; другой набор можно получить через --seed.
+        round_seed = seed + sum((index + 1) * ord(char) for index, char in enumerate(round_name))
+        rng = random.Random(round_seed)
+        available_questions: dict[int, list[ET.Element]] = {}
+        for theme_index, (_, questions) in enumerate(theme_questions):
+            available_questions[theme_index] = list(questions)
+            rng.shuffle(available_questions[theme_index])
+
         for index, type_name in enumerate(SPECIAL_TYPES):
             theme_index = index % theme_count
-            depth = index // theme_count + 1
-            theme, questions = theme_questions[theme_index]
-            question = questions[-min(depth, len(questions))]
+            theme, _ = theme_questions[theme_index]
+            question = available_questions[theme_index].pop()
             set_question_type(question, type_name, theme.get("name", "Секрет"), price_range)
             round_assignments[type_name] = (
                 theme.get("name", ""),
                 int(question.get("price", "0")),
             )
-
-        # Уже существующие секретные вопросы сохраняем на месте, но дополняем
-        # обязательными параметрами, если старый пакет их не содержал.
-        for theme, questions in theme_questions:
-            for question in questions:
-                existing_type = question_type(question)
-                if existing_type in SECRET_TYPES:
-                    _ensure_secret_parameters(
-                        question,
-                        existing_type,
-                        theme.get("name", "Секрет"),
-                        price_range,
-                    )
 
         assignments[round_name] = round_assignments
 
@@ -241,7 +237,10 @@ def validate_question_types(root: ET.Element) -> None:
                 )
 
 
-def update_package(package_path: Path) -> dict[str, dict[str, tuple[str, int]]]:
+def update_package(
+    package_path: Path,
+    seed: int = DEFAULT_SEED,
+) -> dict[str, dict[str, tuple[str, int]]]:
     """Обновляет SIQ/ZIP атомарно, сохраняя все медиа и служебные файлы."""
     if not package_path.is_file():
         raise FileNotFoundError(package_path)
@@ -254,7 +253,7 @@ def update_package(package_path: Path) -> dict[str, dict[str, tuple[str, int]]]:
         raise ValueError(f"В {package_path} отсутствует content.xml")
 
     root = ET.fromstring(content)
-    assignments = apply_question_types(root)
+    assignments = apply_question_types(root, seed=seed)
     validate_question_types(root)
     new_xml = ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
@@ -287,12 +286,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path(__file__).resolve().parents[1] / "zengame.siq",
         help="путь к пакету SIQ (по умолчанию zengame.siq в корне репозитория)",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=DEFAULT_SEED,
+        help=f"seed случайного распределения (по умолчанию {DEFAULT_SEED})",
+    )
     return parser
 
 
 def main() -> int:
     args = build_parser().parse_args()
-    assignments = update_package(args.package)
+    assignments = update_package(args.package, seed=args.seed)
     for round_name, types in assignments.items():
         print(round_name)
         for type_name, (theme, price) in types.items():
