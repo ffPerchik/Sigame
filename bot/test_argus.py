@@ -10,7 +10,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from bot.argus import format_line
-from bot.timed_messages import normalize_messages, send_messages, wait_before
+from bot.timed_messages import normalize_messages, send_messages, send_typewriter, wait_before
 
 
 class TimedMessagesTests(unittest.IsolatedAsyncioTestCase):
@@ -60,7 +60,56 @@ class TimedMessagesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sent[2][0], datetime(2026, 8, 22, 12, 0, 3, 500000, tzinfo=timezone.utc))
         self.assertEqual(sent[2][1], "[12:00:03.500] ARGVS-1001 // TWO")
 
-    async def test_activity_wraps_delay_and_message_send(self):
+    async def test_typewriter_defaults_to_one_character_at_a_time(self):
+        versions = []
+
+        async def send(partial):
+            versions.append(partial)
+            return "message"
+
+        async def edit(_message, partial):
+            versions.append(partial)
+
+        async def sleep(_delay):
+            pass
+
+        await send_typewriter("Женя", send, edit, sleep=sleep)
+        self.assertEqual(versions, ["Ж", "Же", "Жен", "Женя"])
+
+    async def test_typewriter_edits_one_message_without_trailing_delay(self):
+        events = []
+        message = object()
+
+        async def send(partial):
+            events.append(("send", partial))
+            return message
+
+        async def edit(sent_message, partial):
+            self.assertIs(sent_message, message)
+            events.append(("edit", partial))
+
+        async def sleep(delay):
+            events.append(("sleep", delay))
+
+        result = await send_typewriter(
+            "ABCDEFGH",
+            send,
+            edit,
+            chunk_size=3,
+            interval=0.2,
+            sleep=sleep,
+        )
+
+        self.assertIs(result, message)
+        self.assertEqual(events, [
+            ("send", "ABC"),
+            ("sleep", 0.2),
+            ("edit", "ABCDEF"),
+            ("sleep", 0.2),
+            ("edit", "ABCDEFGH"),
+        ])
+
+    async def test_activity_wraps_delay_and_progressive_send(self):
         events = []
 
         @asynccontextmanager
@@ -75,19 +124,23 @@ class TimedMessagesTests(unittest.IsolatedAsyncioTestCase):
             events.append(("delay", delay))
 
         async def send(text):
-            events.append(("sent", text))
+            events.append(("ordinary_send", text))
+
+        async def progressive_send(text):
+            events.append(("progressive_send", text))
 
         await send_messages(
             [{"speaker": "zhenya", "text": "Печатаю", "delay": 1.5}],
             send,
             sleep=sleep,
             activity=activity,
+            progressive_send=progressive_send,
         )
 
         self.assertEqual(events, [
             ("activity_started", "zhenya"),
             ("delay", 1.5),
-            ("sent", "Печатаю"),
+            ("progressive_send", "Печатаю"),
             ("activity_finished", "zhenya"),
         ])
 

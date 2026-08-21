@@ -10,6 +10,7 @@ from pathlib import Path
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.exceptions import TelegramRetryAfter
 from aiogram.filters import BaseFilter, Command, CommandStart
 from aiogram.types import (
     CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message,
@@ -21,14 +22,18 @@ try:  # `python -m bot.bot`
     from . import db, quest
     from . import texts as T
     from .media_spec import delivery_field, parse_media_spec
-    from .timed_messages import send_messages as send_timed_messages, wait_before
+    from .timed_messages import (
+        send_messages as send_timed_messages, send_typewriter, wait_before,
+    )
 except ImportError:  # `python bot/bot.py` или запуск из папки bot
     import config as cfg
     import db
     import quest
     import texts as T
     from media_spec import delivery_field, parse_media_spec
-    from timed_messages import send_messages as send_timed_messages, wait_before
+    from timed_messages import (
+        send_messages as send_timed_messages, send_typewriter, wait_before,
+    )
 
 BASE = Path(__file__).resolve().parent
 INTRO_STAGE = quest.first_stage()
@@ -89,6 +94,41 @@ def _message_activity(uid: int):
     return lambda item: _speaker_activity(uid, item.speaker)
 
 
+async def _retry_telegram_edit(operation):
+    """Соблюдает указанную Telegram паузу, если частые правки упёрлись в лимит."""
+    while True:
+        try:
+            return await operation()
+        except TelegramRetryAfter as error:
+            await asyncio.sleep(max(0.1, float(error.retry_after)))
+
+
+async def _send_typewriter_text(uid: int, text: str):
+    async def edit(message: Message, partial: str):
+        return await _retry_telegram_edit(lambda: message.edit_text(partial))
+
+    return await send_typewriter(
+        text,
+        lambda partial: bot.send_message(uid, partial),
+        edit,
+        chunk_size=cfg.ZHENYA_TYPEWRITER_CHUNK,
+        interval=cfg.ZHENYA_TYPEWRITER_INTERVAL,
+    )
+
+
+async def _send_typewriter_media(sender, uid: int, path: Path, text: str):
+    async def edit(message: Message, partial: str):
+        return await _retry_telegram_edit(lambda: message.edit_caption(caption=partial))
+
+    return await send_typewriter(
+        text,
+        lambda partial: sender(uid, FSInputFile(path), caption=partial),
+        edit,
+        chunk_size=cfg.ZHENYA_TYPEWRITER_CHUNK,
+        interval=cfg.ZHENYA_TYPEWRITER_INTERVAL,
+    )
+
+
 def _resolve(arg: str):
     arg = (arg or "").strip().lstrip("@")
     if arg.isdigit():
@@ -119,6 +159,7 @@ async def send_stage(uid: int, stage_id: str) -> None:
             messages,
             lambda line: bot.send_message(uid, line),
             activity=_message_activity(uid),
+            progressive_send=lambda line: _send_typewriter_text(uid, line),
         )
 
     text = (st.get("text") or "").strip()
@@ -150,12 +191,18 @@ async def send_stage(uid: int, stage_id: str) -> None:
             sender, kind_label = media_senders[actual_field]
             path = Path(spec.path) if Path(spec.path).is_absolute() else media_dir / spec.path
             try:
-                await sender(uid, FSInputFile(path), caption=text)
+                if st.get("speaker") == "zhenya" and text:
+                    await _send_typewriter_media(sender, uid, path, text)
+                else:
+                    await sender(uid, FSInputFile(path), caption=text)
                 return
             except Exception as e:
                 print(T.MEDIA_FAIL.format(kind=kind_label, path=path, err=e))
         if text:
-            await bot.send_message(uid, text)
+            if st.get("speaker") == "zhenya":
+                await _send_typewriter_text(uid, text)
+            else:
+                await bot.send_message(uid, text)
 
 
 # ======================== HUB ===============================================
@@ -338,9 +385,17 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
             path = (Path(welcome_image) if Path(welcome_image).is_absolute()
                     else BASE / "quest" / "images" / welcome_image)
             try:
-                await bot.send_photo(uid, FSInputFile(path), caption=welcome_text)
+                if welcome.get("speaker") == "zhenya":
+                    await _send_typewriter_media(bot.send_photo, uid, path, welcome_text)
+                else:
+                    await bot.send_photo(uid, FSInputFile(path), caption=welcome_text)
             except Exception:
-                await bot.send_message(uid, welcome_text)
+                if welcome.get("speaker") == "zhenya":
+                    await _send_typewriter_text(uid, welcome_text)
+                else:
+                    await bot.send_message(uid, welcome_text)
+        elif welcome.get("speaker") == "zhenya":
+            await _send_typewriter_text(uid, welcome_text)
         else:
             await bot.send_message(uid, welcome_text)
 

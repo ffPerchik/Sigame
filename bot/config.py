@@ -37,6 +37,11 @@ PROXY = os.environ.get("PROXY", "").strip()
 DB_PATH = os.environ.get("DB_PATH") or str(BASE / "quest.db")
 QUEST_FILE = os.environ.get("QUEST_FILE") or str(BASE / "quest" / "stages.yaml")
 NOTIFY_HOST = os.environ.get("NOTIFY_HOST", "1") == "1"
+# Эффект живого набора реплик Жени: символов за одно обновление и пауза между ними.
+ZHENYA_TYPEWRITER_CHUNK = max(1, int(os.environ.get("ZHENYA_TYPEWRITER_CHUNK", "1")))
+ZHENYA_TYPEWRITER_INTERVAL = max(
+    0.0, float(os.environ.get("ZHENYA_TYPEWRITER_INTERVAL", "0.15")),
+)
 
 if not BOT_TOKEN or not HOST_ID:
     raise RuntimeError("Заполни BOT_TOKEN и HOST_ID в bot/.env (см. .env.example)")

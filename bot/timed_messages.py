@@ -48,6 +48,37 @@ def normalize_messages(items: Iterable[object]) -> list[TimedMessage]:
     return result
 
 
+async def send_typewriter(
+    text: str,
+    send: Callable[[str], Awaitable[object]],
+    edit: Callable[[object, str], Awaitable[object]],
+    *,
+    chunk_size: int = 1,
+    interval: float = 0.15,
+    sleep: Callable[[float], Awaitable[object]] = asyncio.sleep,
+) -> object | None:
+    """Отправляет начало текста и допечатывает его редактированием сообщения."""
+    text = text.strip()
+    if not text:
+        return None
+
+    chunk_size = max(1, int(chunk_size))
+    interval = max(0.0, float(interval))
+    first_end = min(chunk_size, len(text))
+    message = await send(text[:first_end])
+
+    for end in range(first_end + chunk_size, len(text), chunk_size):
+        if interval:
+            await sleep(interval)
+        await edit(message, text[:end])
+
+    if first_end < len(text):
+        if interval:
+            await sleep(interval)
+        await edit(message, text)
+    return message
+
+
 async def send_messages(
     items: Iterable[object],
     send: Callable[[str], Awaitable[object]],
@@ -55,11 +86,13 @@ async def send_messages(
     sleep: Callable[[float], Awaitable[object]] = asyncio.sleep,
     now_factory: Callable[[], datetime] | None = None,
     activity: Callable[[TimedMessage], AsyncContextManager[object] | None] | None = None,
+    progressive_send: Callable[[str], Awaitable[object]] | None = None,
 ) -> None:
     """Ждёт delay каждого элемента, затем отправляет именно этот элемент.
 
     `activity` позволяет держать Telegram chat action (например, typing) активным
-    во время ожидания и до фактической отправки сообщения.
+    во время ожидания и до фактической отправки сообщения. `progressive_send`
+    используется для поэтапной отправки реплик Жени.
     """
 
     async def deliver(item: TimedMessage) -> None:
@@ -70,7 +103,10 @@ async def send_messages(
             text = format_argus_line(item.text, now)
         else:
             text = item.text
-        await send(text)
+        if item.speaker == "zhenya" and progressive_send:
+            await progressive_send(text)
+        else:
+            await send(text)
 
     for item in normalize_messages(items):
         context = activity(item) if activity else None
