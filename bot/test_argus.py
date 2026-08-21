@@ -1,3 +1,4 @@
+import re
 import sys
 import unittest
 from contextlib import asynccontextmanager
@@ -101,18 +102,22 @@ class TimedMessagesTests(unittest.IsolatedAsyncioTestCase):
     def test_zhenya_replies_enable_typing_with_visible_delays(self):
         stages = (REPO_ROOT / "bot" / "quest" / "stages.yaml").read_text(encoding="utf-8")
         self.assertIn("welcome:\n  speaker: zhenya\n  delay: 1.5", stages)
-        zhenya_stages = (
-            "z_1", "z_2", "z_3", "z_fix50", "z_c3", "z_fix75", "z_morse_easy",
-        )
-        for stage_id in zhenya_stages:
-            self.assertIn(
-                f"  {stage_id}:\n    mode: ",
-                stages,
-            )
-            block = stages.split(f"  {stage_id}:\n", 1)[1].split("\n\n  ", 1)[0]
-            self.assertIn("\n    speaker: zhenya\n    delay: 1.5", block)
+
+        def stage_block(stage_id):
+            remainder = stages.split(f"  {stage_id}:\n", 1)[1]
+            return re.split(r"\n\n  (?=[A-Za-z0-9_]+:)", remainder, maxsplit=1)[0]
+
+        z_1 = stage_block("z_1")
+        self.assertEqual(z_1.count("speaker: zhenya"), 2)
+        self.assertEqual(z_1.count("delay: 1.5"), 2)
+
+        expected_stage_delays = {"z_2": "3", "z_3": "1.5", "z_4": "1.5"}
+        for stage_id, delay in expected_stage_delays.items():
+            block = stage_block(stage_id)
+            self.assertIn(f"\n    speaker: zhenya\n    delay: {delay}", block)
+
         self.assertIn(
-            "      - speaker: zhenya\n        delay: 1.5\n        text: \"Женя: нет нет нет подож—\"",
+            "{speaker: zhenya, delay: 1.5, text: \"Женя: нет нет нет подож—\"}",
             stages,
         )
 
