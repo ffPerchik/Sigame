@@ -12,7 +12,7 @@
 выбора вопроса (`тема, номинал`) со следующими начислениями/списаниями игроков. Так
 автоматически получается, кто на какой вопрос ответил верно или неверно.
 
-`tools/sigame_achievements.py` читает журнал и `zengame.siq`, восстанавливает ход
+`bot/tools/sigame_achievements.py` читает журнал и `zengame.siq`, восстанавливает ход
 игры, выдаёт ачивки и печатает готовые `/addhint` для Telegram-бота.
 
 ### Как использовать в Steam
@@ -37,20 +37,20 @@
 Запусти из корня проекта:
 
 ```powershell
-python tools\sigame_achievements.py
+python bot\tools\sigame_achievements.py
 ```
 
 Скрипт сам найдёт последний Steam-журнал. Можно передать конкретный файл:
 
 ```powershell
-python tools\sigame_achievements.py "C:\path\game-log.txt"
+python bot\tools\sigame_achievements.py "C:\path\game-log.txt"
 ```
 
 Никаких дополнительных флагов или файлов соответствий не требуется. Скрипт ничего
-не печатает в консоль и создаёт рядом с журналом файл:
+не печатает в консоль и сохраняет отчёт в `bot/quest/achievements/`:
 
 ```text
-game-log-2026-08-21T15-54-02-achievements.txt
+bot/quest/achievements/game-log-2026-08-21T15-54-02-achievements.txt
 ```
 
 В нём сначала перечислены только сработавшие ачивки и получившие их игроки, а в
@@ -91,7 +91,7 @@ game-log-2026-08-21T15-54-02-achievements.txt
 по разным игрокам. Жёсткого лимита нет; при желании ведущий может ограничить итог,
 например, максимумом в 10 подсказок на человека.
 
-Пороговые значения вынесены в начало `tools/sigame_achievements.py`:
+Пороговые значения вынесены в начало `bot/tools/sigame_achievements.py`:
 `MIN_ACCURACY_ATTEMPTS`, `TARGET_SCORE`, `HIGH_ROLLER_DELTA`, `COMEBACK_FLOOR`.
 
 ## Что действительно собирает SIGame

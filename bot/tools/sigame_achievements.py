@@ -24,6 +24,10 @@ from pathlib import Path
 from typing import Iterable
 
 
+BOT_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = BOT_ROOT.parent
+REPORTS_DIR = BOT_ROOT / "quest" / "achievements"
+
 MIN_ACCURACY_ATTEMPTS = 10
 TARGET_SCORE = 6767
 HIGH_ROLLER_DELTA = 2000
@@ -862,7 +866,7 @@ def render_report(game: GameData, awards: dict[str, list[Award]]) -> str:
 
 
 def report_path_for(log_path: Path) -> Path:
-    return log_path.with_name(f"{log_path.stem}-achievements.txt")
+    return REPORTS_DIR / f"{log_path.stem}-achievements.txt"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -884,7 +888,7 @@ def main(argv: list[str] | None = None) -> int:
         path = find_latest_log(args.log)
         package_candidates = [
             Path.cwd() / "zengame.siq",
-            Path(__file__).resolve().parents[1] / "zengame.siq",
+            REPO_ROOT / "zengame.siq",
         ]
         package_path = next((item for item in package_candidates if item.exists()), None)
 
@@ -894,6 +898,7 @@ def main(argv: list[str] | None = None) -> int:
 
         awards = calculate_awards(game)
         output_path = report_path_for(path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(render_report(game, awards), encoding="utf-8")
     except (OSError, ValueError, KeyError, zipfile.BadZipFile, ET.ParseError) as exc:
         print(f"Ошибка: {exc}", file=sys.stderr)

@@ -13,6 +13,7 @@ ARG-квеста в стиле Cicada 3301.
 | `tools/make_stego_image.py` | Стеганография: прячет послание в `content/Images/final_photo.png`. |
 | `content/Images/` | Картинки тем (Армянская еда, BTS) + `final_photo.png` (стегано). |
 | `content/stego_carrier.jpg` | Носитель для стегано (обычный пейзаж). |
+| `bot/` | Весь Telegram-бот и ARG: сценарий, ассеты, инструменты и документация. |
 
 ## Содержание пакета
 
@@ -52,21 +53,22 @@ python3 tools/build_v5.py            # собрать zengame.siq
 ## Ачивки SIGame → подсказки квеста
 
 SIGame сохраняет журнал игры: Steam-версия — TXT, классическая — подробный HTML.
-После игры скрипт автоматически считает ачивки и создаёт рядом с журналом TXT-отчёт:
+После игры скрипт автоматически считает ачивки и сохраняет TXT-отчёт в
+`bot/quest/achievements/`:
 
 ```bash
-python tools/sigame_achievements.py path/to/game-log.txt
+python bot/tools/sigame_achievements.py path/to/game-log.txt
 ```
 
 Список ачивок и инструкция —
-[`doc/SIGAME_ACHIEVEMENTS.md`](doc/SIGAME_ACHIEVEMENTS.md).
+[`bot/docs/SIGAME_ACHIEVEMENTS.md`](bot/docs/SIGAME_ACHIEVEMENTS.md).
 
 ## Квест после входа
 
 Telegram-бот (`bot/`), хаб на 6 независимых узлов. В каждом узле несколько
 слоёв (LSB, Морзе, Виженер, книжный шифр, спектр, HTML-исходник и т.д.).
-Сценарий: `bot/quest/stages.yaml`. Разгадка для ведущего: `doc/QUEST_WALKTHROUGH.md`.
-Ассеты: `python3 tools/make_quest_assets.py`.
+Сценарий: `bot/quest/stages.yaml`. Разгадка для ведущего: `bot/docs/QUEST_WALKTHROUGH.md`.
+Ассеты: `python3 bot/tools/make_quest_assets.py`.
 
 ## Примечание
 

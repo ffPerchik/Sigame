@@ -6,7 +6,8 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.sigame_achievements import (
+import bot.tools.sigame_achievements as achievements
+from bot.tools.sigame_achievements import (
     QuestionContext,
     calculate_awards,
     find_latest_log,
@@ -97,10 +98,13 @@ Alice: Right: 1/100, Wrong: 0/0
             log_path.write_text(content, encoding="utf-8")
 
             stdout = io.StringIO()
-            with redirect_stdout(stdout):
-                self.assertEqual(main([str(log_path)]), 0)
+            reports_dir = Path(temp_dir) / "quest" / "achievements"
+            with patch.object(achievements, "REPORTS_DIR", reports_dir):
+                with redirect_stdout(stdout):
+                    self.assertEqual(main([str(log_path)]), 0)
+                output_path = report_path_for(log_path)
 
-            output_path = report_path_for(log_path)
+            self.assertEqual(output_path.parent, reports_dir)
             self.assertTrue(output_path.exists())
             self.assertEqual(stdout.getvalue(), "")
             report = output_path.read_text(encoding="utf-8")
@@ -121,7 +125,10 @@ Alice: Right: 1/100, Wrong: 0/0
             logs_dir.mkdir(parents=True)
             steam_log = logs_dir / "game-log-2026-08-21.txt"
             steam_log.write_text("test", encoding="utf-8")
-            report_path_for(steam_log).write_text("newer generated report", encoding="utf-8")
+            (logs_dir / "game-log-2026-08-21-achievements.txt").write_text(
+                "newer generated report",
+                encoding="utf-8",
+            )
 
             with patch.dict(os.environ, {"LOCALAPPDATA": temp_dir}):
                 self.assertEqual(find_latest_log(None), steam_log)
