@@ -10,19 +10,25 @@ import numpy as np
 import piexif
 from PIL import Image, ImageDraw, ImageFont
 
-from quest_crypto import (
-    RU, a1z26_encode, atbash, only_ru, pigpen_cell,
-    rail_fence_enc, vigenere,
-)
+try:
+    from .quest_crypto import (
+        RU, a1z26_encode, atbash, only_ru, pigpen_cell,
+        rail_fence_enc, vigenere,
+    )
+except ImportError:  # запуск как `python bot/tools/make_quest_assets.py`
+    from quest_crypto import (
+        RU, a1z26_encode, atbash, only_ru, pigpen_cell,
+        rail_fence_enc, vigenere,
+    )
 
-ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "bot" / "quest" / "images"
+BOT_ROOT = Path(__file__).resolve().parent.parent
+OUT = BOT_ROOT / "quest" / "images"
 OUT.mkdir(parents=True, exist_ok=True)
 
 FONTS = [
-    str(ROOT / "tools" / "fonts" / "DejaVuSans-Bold.ttf"),
-    str(ROOT / "tools" / "fonts" / "DejaVuSans.ttf"),
-    str(ROOT / "tools" / "fonts" / "DejaVuSansMono-Bold.ttf"),
+    str(BOT_ROOT / "tools" / "fonts" / "DejaVuSans-Bold.ttf"),
+    str(BOT_ROOT / "tools" / "fonts" / "DejaVuSans.ttf"),
+    str(BOT_ROOT / "tools" / "fonts" / "DejaVuSansMono-Bold.ttf"),
     r"C:\Windows\Fonts\arialbd.ttf",
     r"C:\Windows\Fonts\arial.ttf",
     r"C:\Windows\Fonts\segoeuib.ttf",
@@ -39,7 +45,7 @@ def font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         if Path(p).exists():
             return ImageFont.truetype(p, size)
     raise FileNotFoundError(
-        "Нет шрифта с кириллицей. В репо должен быть tools/fonts/DejaVuSans-Bold.ttf"
+        "Нет шрифта с кириллицей. В репо должен быть bot/tools/fonts/DejaVuSans-Bold.ttf"
     )
 
 
@@ -182,8 +188,8 @@ def draw_pigpen(draw: ImageDraw.ImageDraw, xy: tuple[int, int], ch: str, scale=1
 
 
 def _n1_still() -> Image.Image:
-    """Свой кадр для N1 — content/n1_carrier.jpg, не финал SIGame."""
-    src = ROOT / "content" / "n1_carrier.jpg"
+    """Свой кадр для N1 — bot/quest/source/n1_carrier.jpg, не финал SIGame."""
+    src = BOT_ROOT / "quest" / "source" / "n1_carrier.jpg"
     img = Image.open(src).convert("RGB")
     return img.resize((1200, 800))
 
@@ -212,7 +218,7 @@ def make_n1():
         f.write(tail)
     raw = jpg_path.read_bytes()
     assert raw[-len(tail):] == tail
-    print("  N1  надпись на кадре рисует ведущий на content/n1_carrier.jpg → СМОТРИ ВНУТРЬ")
+    print("  N1  надпись на кадре рисует ведущий на bot/quest/source/n1_carrier.jpg → СМОТРИ ВНУТРЬ")
     print("  N1  EXIF Artist=255,217 (= FF D9), без текстового спойлера")
     print(f"  N1  после FFD9 дописано «secret code: {msg}» → СЛОИ")
     return jpg_path
@@ -649,9 +655,10 @@ def write_readme():
     (OUT / "README.md").write_text(
         """# Медиа ARG «Аргус-1001»
 
-Пересборка: `python3 tools/make_quest_assets.py`
+Зависимости: `pip install -r bot/tools/requirements.txt`.
+Пересборка: `python3 bot/tools/make_quest_assets.py`.
 
-Все файлы принадлежат узлам N1–N6 (см. `doc/QUEST_WALKTHROUGH.md`).
+Все файлы принадлежат узлам N1–N6 (см. `bot/docs/QUEST_WALKTHROUGH.md`).
 `n1_card.jpg` шлётся как document, иначе Telegram сожмёт EXIF и хвост JPEG.
 """,
         encoding="utf-8",
