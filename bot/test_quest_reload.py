@@ -79,10 +79,12 @@ class QuestReloadTests(unittest.TestCase):
         self.assertIn("стадий: 1", details)
         self.assertEqual(quest.get_stage("manual")["mode"], "gate")
 
-    def test_update_command_is_host_only(self):
+    def test_update_command_validates_and_restarts_the_whole_bot(self):
         source = (REPO_ROOT / "bot" / "bot.py").read_text(encoding="utf-8")
         self.assertIn('HostFilter(), Command("update", "reload")', source)
         self.assertIn("quest.reload_from_disk()", source)
+        self.assertIn("validate_python_tree(BASE)", source)
+        self.assertIn("restart_current_process()", source)
 
 
 if __name__ == "__main__":

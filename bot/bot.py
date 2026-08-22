@@ -23,6 +23,7 @@ try:  # `python -m bot.bot`
     from . import texts as T
     from .hints import stage_hints
     from .media_spec import delivery_field, parse_media_spec
+    from .reloader import restart_current_process, validate_python_tree
     from .timed_messages import (
         send_messages as send_timed_messages, send_typewriter, wait_before,
     )
@@ -33,6 +34,7 @@ except ImportError:  # `python bot/bot.py` или запуск из папки b
     import texts as T
     from hints import stage_hints
     from media_spec import delivery_field, parse_media_spec
+    from reloader import restart_current_process, validate_python_tree
     from timed_messages import (
         send_messages as send_timed_messages, send_typewriter, wait_before,
     )
@@ -641,11 +643,19 @@ async def cb_rej(cq: CallbackQuery) -> None:
 
 @dp.message(HostFilter(), Command("update", "reload"))
 async def cmd_update(message: Message) -> None:
-    ok, details = quest.reload_from_disk()
-    if ok:
-        await message.answer(T.UPDATE_OK.format(details=details))
-    else:
-        await message.answer(T.UPDATE_FAIL.format(error=details))
+    scenario_ok, scenario_details = quest.reload_from_disk()
+    if not scenario_ok:
+        return await message.answer(T.UPDATE_FAIL.format(error=scenario_details))
+
+    python_ok, python_details = validate_python_tree(BASE)
+    if not python_ok:
+        return await message.answer(T.UPDATE_FAIL.format(error=python_details))
+
+    await message.answer(T.UPDATE_RESTARTING.format(
+        details=f"{scenario_details}; {python_details}",
+    ))
+    await asyncio.sleep(0.8)  # дать Telegram доставить подтверждение до exec
+    restart_current_process()
 
 
 @dp.message(HostFilter(), Command("stats"))
