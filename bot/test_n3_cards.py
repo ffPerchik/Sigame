@@ -20,7 +20,8 @@ class N3CardStyleTests(unittest.TestCase):
     def test_generator_uses_script_font_without_glitches(self):
         source = (REPO_ROOT / "bot" / "tools" / "make_quest_assets.py").read_text(encoding="utf-8")
         n3 = source.split("def make_n3():", 1)[1].split("# ===================================================================== N4", 1)[0]
-        self.assertIn('crib = "СИКСЕВЕН"', n3)
+        self.assertIn('crib = "СИКССЕВЕН"', n3)
+        self.assertIn("рядом с известным словом", n3)
         self.assertIn("parchment_page()", n3)
         self.assertIn("script_font(", n3)
         self.assertNotIn("hack_glitch", n3)

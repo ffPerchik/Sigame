@@ -511,7 +511,7 @@ def make_n2():
 def make_n3():
     """Четыре реалистичных листа: pigpen → rail → Vigenere → book cipher."""
     word1 = "РЕШЕТКА"
-    crib = "СИКСЕВЕН"
+    crib = "СИКССЕВЕН"
     rail_plain = "ВИЖНЕР"
     rail_c = rail_fence_enc(rail_plain, 3)
     vig_plain = "СТРОФА"
@@ -535,7 +535,7 @@ def make_n3():
     faded_ink = (92, 62, 39)
     accent = (112, 43, 31)
 
-    # Лист I: основное слово и вертикальная известная пара СИКСЕВЕН на полях.
+    # Лист I: рядом с известным словом СИКССЕВЕН показана его шифрованная запись.
     page1 = parchment_page()
     draw = ImageDraw.Draw(page1)
     centered_text(draw, "Лист I", 105, script_font(82), ink)
@@ -543,11 +543,20 @@ def make_n3():
     for index, letter in enumerate(word1):
         draw_pigpen(draw, (90 + index * 120, 365), letter, scale=40, color=ink, width=4)
     draw.line((120, 535, 900, 535), fill=faded_ink, width=2)
-    draw.text((150, 690), "проверка пера", fill=faded_ink, font=script_font(46))
+    centered_text(draw, "пример на полях", 675, script_font(46), faded_ink)
+    label_font = script_font(54)
+    label_x, label_y = 105, 790
+    draw.text((label_x, label_y), crib, fill=ink, font=label_font)
+    label_box = draw.textbbox((label_x, label_y), crib, font=label_font)
+    arrow_x = label_box[2] + 18
+    draw.line((arrow_x, 827, arrow_x + 42, 827), fill=ink, width=3)
+    draw.polygon(
+        [(arrow_x + 42, 827), (arrow_x + 31, 819), (arrow_x + 31, 835)],
+        fill=ink,
+    )
+    cipher_x = arrow_x + 64
     for index, letter in enumerate(crib):
-        y = 625 + index * 92
-        draw_pigpen(draw, (690, y), letter, scale=16, color=ink, width=3)
-        draw.text((750, y - 11), f"— {letter}", fill=ink, font=script_font(44))
+        draw_pigpen(draw, (cipher_x + index * 47, 805), letter, scale=14, color=ink, width=3)
     page1.save(OUT / "artifact_3a.png", optimize=True)
 
     # Лист II: никаких названий метода — только след из трёх линий.
