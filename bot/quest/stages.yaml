@@ -204,7 +204,8 @@ stages:
     next: N1_photo
 
   N1_photo:
-    mode: auto
+    mode: info
+    text: |
       Мы перехватили этот кадр. Для начала проверим, что кадр дошёл до тебя.
     document: n1_card.jpg
     next: N1_flip
@@ -280,7 +281,7 @@ stages:
     next: N2_cipherinfo
 
   N2_cipherinfo:
-    mode: info
+    mode: auto
     text: |
       Честно, я уже задрался с этими голосовыми... Но вот тебе ещё 1. Главбосс мне сказал, что оно с пердыдущими как-то связано
     audio: n2_3.wav

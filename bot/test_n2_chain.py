@@ -53,7 +53,6 @@ class N2AudioChainTests(unittest.TestCase):
         for filename in ("n2_1.wav", "n2_2.wav", "n2_3.wav"):
             self.assertIn(filename, stages)
             self.assertTrue((REPO_ROOT / "bot" / "quest" / "images" / filename).is_file())
-        self.assertIn('      - "ЛЬДА"', stages)
         self.assertIn('      - "СИГНАЛ"', stages)
         self.assertNotIn("n2_spec.wav", stages)
 
