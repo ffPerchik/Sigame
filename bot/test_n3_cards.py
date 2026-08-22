@@ -21,7 +21,12 @@ class N3CardStyleTests(unittest.TestCase):
         source = (REPO_ROOT / "bot" / "tools" / "make_quest_assets.py").read_text(encoding="utf-8")
         n3 = source.split("def make_n3():", 1)[1].split("# ===================================================================== N4", 1)[0]
         self.assertIn('crib = "СИКССЕВЕН"', n3)
-        self.assertIn("рядом с известным словом", n3)
+        self.assertIn('"Решил создать новый язык,"', n3)
+        self.assertIn('"«сикс севен»"', n3)
+        self.assertIn("scale=11, color=ink, width=5", n3)
+        self.assertIn("start_y + index * 68", n3)
+        self.assertIn("scale=25", n3)
+        self.assertIn("width=7", n3)
         self.assertIn("parchment_page()", n3)
         self.assertIn("script_font(", n3)
         self.assertNotIn("hack_glitch", n3)

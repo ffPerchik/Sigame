@@ -535,28 +535,43 @@ def make_n3():
     faded_ink = (92, 62, 39)
     accent = (112, 43, 31)
 
-    # Лист I: рядом с известным словом СИКССЕВЕН показана его шифрованная запись.
+    # Лист I: автор объясняет свой язык на словах «сикс севен», затем даёт загадку.
     page1 = parchment_page()
     draw = ImageDraw.Draw(page1)
-    centered_text(draw, "Лист I", 105, script_font(82), ink)
-    centered_text(draw, "знаки тоже умеют помнить слова", 215, script_font(42), faded_ink)
-    for index, letter in enumerate(word1):
-        draw_pigpen(draw, (90 + index * 120, 365), letter, scale=40, color=ink, width=4)
-    draw.line((120, 535, 900, 535), fill=faded_ink, width=2)
-    centered_text(draw, "пример на полях", 675, script_font(46), faded_ink)
-    label_font = script_font(54)
-    label_x, label_y = 105, 790
-    draw.text((label_x, label_y), crib, fill=ink, font=label_font)
-    label_box = draw.textbbox((label_x, label_y), crib, font=label_font)
-    arrow_x = label_box[2] + 18
-    draw.line((arrow_x, 827, arrow_x + 42, 827), fill=ink, width=3)
+    centered_text(draw, "Лист I", 75, script_font(76), ink)
+    centered_text(draw, "Решил создать новый язык,", 185, script_font(43), faded_ink)
+    centered_text(draw, "вот так вот будет на нём звучать", 245, script_font(43), faded_ink)
+    centered_text(draw, "моё любимое слово", 305, script_font(43), faded_ink)
+
+    label_font = script_font(50)
+    label_x, label_y = 90, 400
+    draw.text((label_x, label_y), "«сикс севен»", fill=ink, font=label_font)
+    label_box = draw.textbbox((label_x, label_y), "«сикс севен»", font=label_font)
+    arrow_x = label_box[2] + 15
+    arrow_y = 436
+    draw.line((arrow_x, arrow_y, arrow_x + 38, arrow_y), fill=ink, width=4)
     draw.polygon(
-        [(arrow_x + 42, 827), (arrow_x + 31, 819), (arrow_x + 31, 835)],
+        [(arrow_x + 38, arrow_y), (arrow_x + 27, arrow_y - 8), (arrow_x + 27, arrow_y + 8)],
         fill=ink,
     )
-    cipher_x = arrow_x + 64
+    cipher_x = arrow_x + 53
     for index, letter in enumerate(crib):
-        draw_pigpen(draw, (cipher_x + index * 47, 805), letter, scale=14, color=ink, width=3)
+        draw_pigpen(draw, (cipher_x + index * 49, 416), letter, scale=11, color=ink, width=5)
+
+    draw.line((120, 565, 900, 565), fill=faded_ink, width=2)
+    centered_text(draw, "А теперь — загадка", 650, script_font(52), ink)
+
+    # Само послание идёт диагонально слева направо; знаки меньше, но черта толще.
+    start_x, start_y = 145, 785
+    for index, letter in enumerate(word1):
+        draw_pigpen(
+            draw,
+            (start_x + index * 105, start_y + index * 68),
+            letter,
+            scale=25,
+            color=ink,
+            width=7,
+        )
     page1.save(OUT / "artifact_3a.png", optimize=True)
 
     # Лист II: никаких названий метода — только след из трёх линий.
