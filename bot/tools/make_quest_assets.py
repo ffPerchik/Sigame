@@ -549,7 +549,7 @@ def make_n3():
     for i, ch in enumerate("АБВ"):
         draw_pigpen(d, (50 + i * 90, 460), ch, scale=16)
         d.text((50 + i * 90, 530), ch, fill=(70, 60, 50), font=font(18))
-    hack_glitch(p1, seed=31).save(OUT / "artifact_3a.png")
+    hack_glitch(p1, seed=31, power=0.7).save(OUT / "artifact_3a.png")
 
     p2 = Image.new("RGB", (1100, 420), (232, 216, 190))
     d = ImageDraw.Draw(p2)
@@ -563,7 +563,7 @@ def make_n3():
     d.text((36, 20), "ТЕТРАДЬ · лист III   ключ — то, что открыл лист I", fill=(80, 50, 30), font=font(24))
     d.text((36, 140), vig_c, fill=(20, 20, 50), font=font(64))
     d.text((36, 280), "Виженер. Алфавит 32 буквы, без Ё. Ключ уже у тебя.", fill=(70, 60, 50), font=font(22))
-    hack_glitch(p3, seed=33).save(OUT / "artifact_3c.png")
+    hack_glitch(p3, seed=33, power=0.5).save(OUT / "artifact_3c.png")
 
     p4 = Image.new("RGB", (1100, 640), (232, 216, 190))
     d = ImageDraw.Draw(p4)
