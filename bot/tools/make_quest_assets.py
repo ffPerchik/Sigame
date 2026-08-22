@@ -533,21 +533,21 @@ def make_n3():
     for i, ch in enumerate("АБВ"):
         draw_pigpen(d, (50 + i * 90, 460), ch, scale=16)
         d.text((50 + i * 90, 530), ch, fill=(70, 60, 50), font=font(18))
-    hack_glitch(p1, seed=31).save(OUT / "n3_pigpen.png")
+    hack_glitch(p1, seed=31).save(OUT / "artifact_3a.png")
 
     p2 = Image.new("RGB", (1100, 420), (232, 216, 190))
     d = ImageDraw.Draw(p2)
     d.text((36, 20), "ТЕТРАДЬ · лист II   зигзаг / 3 рельса", fill=(80, 50, 30), font=font(26))
     d.text((36, 140), rail_c, fill=(20, 20, 50), font=font(72))
     d.text((36, 280), "Читай как железнодорожную изгородь. Три нити.", fill=(70, 60, 50), font=font(22))
-    hack_glitch(p2, seed=32).save(OUT / "n3_rail.png")
+    hack_glitch(p2, seed=32).save(OUT / "artifact_3b.png")
 
     p3 = Image.new("RGB", (1100, 480), (232, 216, 190))
     d = ImageDraw.Draw(p3)
     d.text((36, 20), "ТЕТРАДЬ · лист III   ключ — то, что открыл лист I", fill=(80, 50, 30), font=font(24))
     d.text((36, 140), vig_c, fill=(20, 20, 50), font=font(64))
     d.text((36, 280), "Виженер. Алфавит 32 буквы, без Ё. Ключ уже у тебя.", fill=(70, 60, 50), font=font(22))
-    hack_glitch(p3, seed=33).save(OUT / "n3_vig.png")
+    hack_glitch(p3, seed=33).save(OUT / "artifact_3c.png")
 
     p4 = Image.new("RGB", (1100, 640), (232, 216, 190))
     d = ImageDraw.Draw(p4)
@@ -557,7 +557,7 @@ def make_n3():
     coord_s = "  ".join(f"{a}.{b}" for a, b in picks)
     d.text((48, 420), coord_s, fill=(140, 30, 30), font=font(36))
     d.text((48, 500), "строка.слово  →  первая буква каждого слова", fill=(70, 60, 50), font=font(22))
-    hack_glitch(p4, seed=34).save(OUT / "n3_book.png")
+    hack_glitch(p4, seed=34).save(OUT / "artifact_3d.png")
 
     print(f"  N3  pigpen {word1}")
     print(f"  N3  rail {rail_plain} → {rail_c}")
@@ -593,7 +593,7 @@ def make_n4():
             d.text((40, 300), "UTF-8", fill=(120, 120, 120), font=font(22))
         hack_glitch(img, seed=40 + i).save(frames_dir / f"f{i:03d}.png")
 
-    mp4 = OUT / "n4_walk.mp4"
+    mp4 = OUT / "artifact_4a.mp4"
     if exe:
         cmd = [
             exe, "-y", "-hide_banner", "-loglevel", "error",
@@ -606,7 +606,7 @@ def make_n4():
         print("  N4  ⚠ нет ffmpeg, только кадры")
 
     # still of signs
-    Image.open(frames_dir / "f000.png").save(OUT / "n4_signs.png")
+    Image.open(frames_dir / "f000.png").save(OUT / "artifact_4b.png")
     # fragmented "QR" — 4 куска с частями слова КАДР as puzzle pieces
     frag = Image.new("RGB", (900, 500), (245, 245, 245))
     d = ImageDraw.Draw(frag)
@@ -635,7 +635,7 @@ def make_n4():
             py = int(rng.integers(y0 + 8, y1 - 12))
             d.rectangle((px, py, px + 8, py + 8), fill=(15, 15, 15))
         d.text((x0 + 40, y0 + 50), ch, fill=(10, 10, 10), font=font(72))
-    hack_glitch(frag, seed=44).save(OUT / "n4_shards.png")
+    hack_glitch(frag, seed=44).save(OUT / "artifact_4c.png")
     print("  N4  shards → КАДР")
 
 
@@ -677,7 +677,7 @@ def make_n5():
             d.text((x + 8, y + 4), str(square[r][c]), fill=(140, 140, 160), font=font(18))
             d.text((x + 36, y + 28), grid_letters[r][c], fill=(10, 10, 30), font=font(40))
     d.text((32, 620), "XXXX в квадрате — шум. Значимы первые пять по порядку.", fill=(90, 90, 110), font=font(20))
-    hack_glitch(tab, seed=51).save(OUT / "n5_table.png")
+    hack_glitch(tab, seed=51).save(OUT / "artifact_5a.png")
 
     html = """<!DOCTYPE html>
 <html lang="ru"><head><meta charset="utf-8"><title>shadow ledger</title></head>
@@ -688,7 +688,7 @@ def make_n5():
 </body></html>
 """
     # ЛОК = d0bb d0be d0ba
-    (OUT / "n5_ledger.html").write_text(html, encoding="utf-8")
+    (OUT / "artifact_5b.html").write_text(html, encoding="utf-8")
     lock = "2584"  # fib
     print(f"  N5  binary → {word_bin}")
     print(f"  N5  square → {word_sq}")
@@ -701,7 +701,7 @@ def make_n5():
     d.text((32, 90), "ряд, который уже встречался в другом узле,\nно здесь — только числа:", fill=(160, 160, 170), font=font(22))
     d.text((32, 190), "1  1  2  3  5  8  13  21", fill=(230, 210, 80), font=font(36))
     d.text((32, 270), "четыре средних двузначных? нет. четыре после единиц.", fill=(120, 120, 130), font=font(20))
-    hack_glitch(lock_img, seed=52).save(OUT / "n5_lock.png")
+    hack_glitch(lock_img, seed=52).save(OUT / "artifact_5c.png")
     # 2 3 5 8 → 2358  "четыре после единиц" = 2,3,5,8
     print("  N5  lock code 2358")
 
@@ -733,7 +733,7 @@ def make_n6():
     d.text((36, 460), vig_c, fill=(240, 220, 120), font=font(56))
     d.text((36, 560), "Алфавит везде один: 32 буквы, без Ё.", fill=(110, 110, 120), font=font(20))
     # null cipher telestich as extra confirmation of ПОРТАЛ? skip to not leak
-    img.save(OUT / "n6_locks.png")
+    img.save(OUT / "artifact_6a.png")
 
     print(f"  N6  A1Z26 of atbash(АТБАШ)={step1_c} → {nums}")
     print(f"  N6  atbash → {step1_plain}")
@@ -752,6 +752,7 @@ def write_readme():
 `n1_card.jpg` шлётся как document, иначе Telegram сожмёт EXIF и хвост JPEG.
 N2 использует связанную цепочку `n2_reversed.wav` → `n2_fibo.wav` → `n2_cipher.wav`;
 в последнем файле скрытая спектрограмма наложена на слышимый вальс.
+Файлы N3–N6 называются нейтрально (`artifact_*`), чтобы имя не выдавало метод решения.
 """,
         encoding="utf-8",
     )

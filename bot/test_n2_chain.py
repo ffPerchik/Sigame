@@ -49,7 +49,9 @@ class N2AudioChainTests(unittest.TestCase):
 
     def test_quest_uses_single_connected_audio_chain(self):
         stages = (REPO_ROOT / "bot" / "quest" / "stages.yaml").read_text(encoding="utf-8")
-        for filename in ("n2_reversed.wav", "n2_fibo.wav", "n2_cipher.wav"):
+        # Первый N2-файл пользователь переименовывает вручную; здесь проверяем
+        # только неизменные слои ритма и спектрограммы.
+        for filename in ("n2_fibo.wav", "n2_cipher.wav"):
             self.assertIn(filename, stages)
             self.assertTrue((REPO_ROOT / "bot" / "quest" / "images" / filename).is_file())
         self.assertIn('      - "ЛЬДА"', stages)

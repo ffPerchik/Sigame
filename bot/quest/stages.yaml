@@ -19,10 +19,10 @@ welcome:
 nodes:
   N1: {label: "СЛОИ СНИМКА", hint: "надпись · файл · хвост"}
   N2: {label: "ЭХО", hint: "реверс · ритм · спектр · многослойный сигнал"}
-  N3: {label: "ТЕТРАДЬ", hint: "знаки · зигзаг · ключ · книга"}
-  N4: {label: "ОДИН КАДР", hint: "вывески · вспышка · обломки"}
-  N5: {label: "СЧЁТ", hint: "биты · квадрат · исходник · замок"}
-  N6: {label: "ЧЕТЫРЕ ЩЕКОЛДЫ", hint: "числа · зеркало · рельсы · ключ"}
+  N3: {label: "ТЕТРАДЬ", hint: "почерк меняется, смысл остаётся"}
+  N4: {label: "ОДИН КАДР", hint: "в записи есть то, чего не должно быть"}
+  N5: {label: "СЧЁТ", hint: "порядок важнее значения"}
+  N6: {label: "ЧЕТЫРЕ ЩЕКОЛДЫ", hint: "каждый ответ открывает следующий"}
 
 stages:
 
@@ -340,7 +340,7 @@ stages:
       ┌─ Узел 3 · ТЕТРАДЬ ─┐
 
       Четыре листа. Первый — вообще не буквы.
-    image: n3_pigpen.png
+    image: artifact_3a.png
     next: N3_pig
 
   N3_pig:
@@ -361,7 +361,7 @@ stages:
     mode: info
     text: |
       Лист II. Тут уже буквы, но они не в том порядке.
-    image: n3_rail.png
+    image: artifact_3b.png
     next: N3_rail
 
   N3_rail:
@@ -384,7 +384,7 @@ stages:
     mode: info
     text: |
       Лист III. Ключ у тебя уже был — с первого листа.
-    image: n3_vig.png
+    image: artifact_3c.png
     next: N3_vig
 
   N3_vig:
@@ -403,7 +403,7 @@ stages:
     mode: info
     text: |
       Последний лист. Цифры снизу — не страницы, а адреса.
-    image: n3_book.png
+    image: artifact_3d.png
     next: N3_book
 
   N3_book:
@@ -438,7 +438,7 @@ stages:
     mode: info
     text: |
       Смотри не как кино. Как слайды.
-    video: n4_walk.mp4
+    video: artifact_4a.mp4
     next: N4_signs
 
   N4_signs:
@@ -450,7 +450,7 @@ stages:
       - "линза"
     hint: |
       Пять витрин, на каждой по букве. Если видео не открылось —
-      кадр n4_signs.png лежит в ассетах.
+      кадр artifact_4b.png лежит в ассетах.
     next: N4_hex
 
   N4_hex:
@@ -469,7 +469,7 @@ stages:
     mode: info
     text: |
       Ещё обломки. Собери, если руки не отвалились.
-    image: n4_shards.png
+    image: artifact_4c.png
     next: N4_word
 
   N4_word:
@@ -498,7 +498,7 @@ stages:
       ┌─ Узел 5 · СЧЁТ ─┐
 
       Числа. Разные системы, один разговор.
-    image: n5_table.png
+    image: artifact_5a.png
     next: N5_bin
 
   N5_bin:
@@ -527,7 +527,7 @@ stages:
     mode: info
     text: |
       Страница. Глазами её смотреть бесполезно.
-    document: n5_ledger.html
+    document: artifact_5b.html
     next: N5_html
 
   N5_html:
@@ -545,7 +545,7 @@ stages:
     mode: info
     text: |
       Замок. Ряд знакомый.
-    image: n5_lock.png
+    image: artifact_5c.png
     next: N5_lock
 
   N5_lock:
@@ -574,7 +574,7 @@ stages:
       ┌─ Узел 6 · ЧЕТЫРЕ ЩЕКОЛДЫ ─┐
 
       Одна доска. Каждый ответ открывает следующий замок.
-    image: n6_locks.png
+    image: artifact_6a.png
     next: N6_a1
 
   N6_a1:
