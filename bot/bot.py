@@ -144,9 +144,16 @@ def _name(p) -> str:
 
 
 async def _request_gate_approval(uid: int, stage_id: str) -> None:
-    """Отправляет ведущему кнопку, открывающую следующий этап игроку."""
+    """Ждёт ручного Accept либо автоматически открывает гейт в HOST_CONSOLE."""
     player = db.get_player(uid)
     name = _name(player) if player else str(uid)
+
+    if cfg.HOST_CONSOLE:
+        _host_print(f"HOST_CONSOLE=1 → авто-одобрение гейта «{stage_id}» для {uid}")
+        db.log_event(uid, "gate_approved", f"{stage_id} (console)")
+        await advance(uid)
+        return
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
             text=T.GATE_ACCEPT_BUTTON,
@@ -154,7 +161,6 @@ async def _request_gate_approval(uid: int, stage_id: str) -> None:
         ),
     ]])
     try:
-        # Для ручного гейта кнопка нужна даже при HOST_CONSOLE=1.
         await bot.send_message(
             cfg.HOST_ID,
             T.GATE_APPROVAL_HOST.format(name=name, stage=stage_id),
@@ -786,7 +792,7 @@ async def main() -> None:
             db.log_event(player["user_id"], "stage_migrated", "start_gate -> z_1")
     await bot.delete_webhook(drop_pending_updates=True)
     me = await bot.get_me()
-    extra = " HOST_CONSOLE=1 (уведомления ведущего → консоль)" if cfg.HOST_CONSOLE else ""
+    extra = " HOST_CONSOLE=1 (уведомления → консоль, гейты → авто)" if cfg.HOST_CONSOLE else ""
     print(T.STARTUP.format(username=me.username, host=cfg.HOST_ID) + extra)
     await dp.start_polling(bot)
 
