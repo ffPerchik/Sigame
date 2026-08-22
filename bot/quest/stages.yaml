@@ -100,8 +100,8 @@ stages:
     mode: info
     messages:
       - {speaker: argus, delay: 1.5, text: "CHANNEL INJECTION: 50%"}
-      - {speaker: argus, delay: 1.5, text: "**WARNING**: UNUSUAL ACTIVITY DETECTED"}
-      - {speaker: argus, delay: 1.5, text: "HOST PROCESS «__kolysheev__» IS ATTEMPTING RESTART"}
+      - {speaker: argus, delay: 1.5, text: "WARNING: UNUSUAL ACTIVITY DETECTED"}
+      - {speaker: argus, delay: 1.5, text: "HOST PROCESS «kolysheev» IS ATTEMPTING RESTART"}
       - {speaker: argus, delay: 1.5, text: "RESTART EMITATION: STARTED"}
     next: bot_1
 
@@ -138,8 +138,8 @@ stages:
       - {speaker: argus, delay: 1.5, text: "CHANNEL OVERWRITE: 100%"}
       - {speaker: argus, delay: 1.5, text: "ПЕРЕДАЧА ПЕРЕХВАЧЕНА"}
       - {speaker: argus, delay: 1.5, text: "ИГРОК, НЕ ЗАКРЫВАЙ СОЕДИНЕНИЕ. ОСТАЛСЯ ОДИН ШАГ."}
-      - {speaker: zhenya, delay: 2.5, text: "нет нет нет подож——————————"}
-      - {speaker: argus, delay: 3, text: "TERMINATING HOST SESSION…"}
+      - {speaker: zhenya, delay: 2.5, text: "нет нет нет подож——"}
+      - {speaker: argus, delay: 0, text: "TERMINATING HOST SESSION…"}
       - {speaker: argus, delay: 1.5, text: "CONNECTION OWNER: ARGVS-1001"}
       - {speaker: argus, delay: 1.5, text: "ЖЕНИ БОЛЬШЕ НЕТ"}
     next: z_hack
@@ -159,12 +159,13 @@ stages:
     mode: auto
     accept_entry_code: true
     correct_text: ""
-    wrong_argus: "КЛЮЧ ОТКЛОНЁН. ВЕРНИСЬ К КОНТЕЙНЕРУ SIGAME И ИЩИ ВНИМАТЕЛЬНЕЕ."
+    wrong_argus: "Ключ отклонён, ты недостоен, но мы дадим тебе ещё 1 шанс, так и быть. (Если ты не играл в sigame, напиши Жене, что ты дошёл до этого этапа)"
     messages:
-      - {speaker: argus, delay: 0.5, text: "ДОПУСК ТРЕБУЕТ КЛЮЧ АКТИВАЦИИ ИЗ КОНТЕЙНЕРА"}
-      - {speaker: argus, delay: 0.5, text: "ВВЕДИ КЛЮЧ. ДОКАЖИ, ЧТО ТЫ НЕ БЕЗНАДЁЖН."}
+      - {speaker: argus, delay: 0.5, text: "Что же, теперь сеанс наш, можно расслабиться"}
+      - {speaker: argus, delay: 0.5, text: "Для начала мы хотим проверить, что ты не безнадёжен"}
+      - {speaker: argus, delay: 0.5, text: "Введи ключ, докажи нам, что с тобой можно работать. Мы запрятали его там, где ты был недавно."}
     hint: |
-      Ключ был спрятан внутри zengame.siq рядом с посланием, которое привело тебя в бот.
+      Ключ спрятан внутри zengame.siq.
     next: quest_unlocked
 
   quest_unlocked:
@@ -172,6 +173,7 @@ stages:
     messages:
       - {speaker: argus, delay: 0.5, text: "ACTIVATION KEY ACCEPTED"}
       - {speaker: argus, delay: 0.5, text: "ДОСТУП К ШЕСТИ УЗЛАМ РАЗРЕШЁН"}
+      - {speaker: argus, delay: 3, text: "Мы свяжемся с тобой, когда придёт время"}
     next: hub
 
   # ============================== N1 ==============================
