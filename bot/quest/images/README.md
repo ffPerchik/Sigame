@@ -5,3 +5,4 @@
 
 Все файлы принадлежат узлам N1–N6 (см. `bot/docs/QUEST_WALKTHROUGH.md`).
 `n1_card.jpg` шлётся как document, иначе Telegram сожмёт EXIF и хвост JPEG.
+N2 использует связанную цепочку `n2_reversed.wav` → `n2_spec.wav` → `n2_cipher.wav`.

@@ -285,13 +285,28 @@ def _write_wav(path: Path, audio: np.ndarray, sr: int = 22050):
         wf.writeframes(pcm.tobytes())
 
 
-def make_morse_wav(text: str, out: Path, reverse: bool = False, sr: int = 22050):
-    unit = int(sr * 0.08)
+def make_morse_wav(
+    text: str,
+    out: Path,
+    reverse: bool = False,
+    sr: int = 22050,
+    unit_seconds: float = 0.08,
+    preserve_spaces: bool = False,
+):
+    """Пишет русский Морзе; при preserve_spaces слова разделены длинной паузой."""
+    unit = int(sr * unit_seconds)
     freq = 680.0
     chunks = []
-    for i, ch in enumerate(only_ru(text)):
+    normalized = text.upper().replace("Ё", "Е")
+    symbols = normalized if preserve_spaces else only_ru(normalized)
+    for ch in symbols:
+        if ch == " " and preserve_spaces:
+            chunks.append(np.zeros(6 * unit, dtype=np.float32))
+            continue
+        if ch not in MORSE_RU:
+            continue
         code = MORSE_RU[ch]
-        for j, sym in enumerate(code):
+        for sym in code:
             n = unit if sym == "." else 3 * unit
             t = np.arange(n) / sr
             tone = np.sin(2 * np.pi * freq * t) * np.hanning(n)
@@ -344,36 +359,23 @@ def make_word_spectrogram_wav(text: str, out: Path, duration: float = 4.0, sr: i
     print(f"  N2  {out.name}  spectrogram «{text}»")
 
 
-def make_n2_sheet():
-    """Стих: слова с индексами Фибоначчи 1,2,3,5,8 → первые буквы Э Х О."""
-    words = ["ЭТОТ", "ХРУПКИЙ", "ОТКЛИК", "ПРЯЧЕТСЯ", "ОСОБО", "ТИХО", "СРЕДИ", "ШУМА"]
-    # fib 1,2,3,5,8 → ЭТОТ ХРУПКИЙ ОТКЛИК ОСОБО ШУМА → ЭХОШ  wait 8=ШУМА
-    # Need ЭХО: fib 1,2,3 only? User wanted multi-layer.
-    # Use 1,3,6: ЭТОТ ОТКЛИК ТИХО → ЭОТ no
-    # words: ЭХО already as first letters of 1,2,3 if word3 starts with О: ЭТОТ ХРУПКИЙ ОТКЛИК → ЭХО
-    # Fourth check: tell them "первые три числа Фибоначчи, большие нуля"
-    out = OUT / "n2_verse.png"
-    img = Image.new("RGB", (1000, 560), (236, 228, 210))
-    d = ImageDraw.Draw(img)
-    d.text((40, 28), "ПОЛЕВОЙ ЖУРНАЛ · запись 1-1-2-3-5-8", fill=(70, 50, 30), font=font(26))
-    verse = "  ".join(words)
-    d.text((40, 120), words[0] + "   " + words[1], fill=(20, 20, 40), font=font(40))
-    d.text((40, 190), words[2] + "   " + words[3], fill=(20, 20, 40), font=font(40))
-    d.text((40, 260), words[4] + "   " + words[5], fill=(20, 20, 40), font=font(40))
-    d.text((40, 330), words[6] + "   " + words[7], fill=(20, 20, 40), font=font(40))
-    d.text((40, 430), "Бери слова на позициях ряда, который\nуже написан в шапке. Из первых букв — слово.",
-           fill=(90, 70, 50), font=font(22))
-    hack_glitch(img, seed=22).save(out)
-    # 1,1,2,3,5,8 with 1-based unique: 1,2,3,5,8 → Э Х О О Ш = ЭХООШ
-    # Better unique fib: 1,2,3 → ЭХО  and header says 1 1 2 3 as hint of fib
-    print("  N2  verse fib 1,2,3 → ЭХО  (первые три ненулевых)")
-    return out
+N2_KEY = "КЛЮЧ"
+N2_PLAIN = "СЛАБЫЙ ИМПУЛЬС ГАСНЕТ НО НОЧНОЙ ЭФИР ЕЩЕ АККУРАТНО ХРАНИТ ЕГО ПОД СЛОЕМ ЛЬДА"
+N2_CIPHER = vigenere(N2_PLAIN, N2_KEY)
+N2_MORSE_MESSAGE = f"ВИЖЕНЕР {N2_CIPHER}"
 
 
 def make_n2():
-    make_morse_wav("КЛЮЧ", OUT / "n2_reversed.wav", reverse=True)
-    make_word_spectrogram_wav("ФИБО", OUT / "n2_ызус.wav", duration=3.6)
-    make_n2_sheet()
+    """КЛЮЧ → ФИБО → Морзе(ВИЖЕНЕР + шифртекст) → СИГНАЛ."""
+    make_morse_wav(N2_KEY, OUT / "n2_reversed.wav", reverse=True)
+    make_word_spectrogram_wav("ФИБО", OUT / "n2_spec.wav", duration=3.6)
+    make_morse_wav(
+        N2_MORSE_MESSAGE,
+        OUT / "n2_cipher.wav",
+        unit_seconds=0.045,
+        preserve_spaces=True,
+    )
+    print(f"  N2  vigenere key={N2_KEY}: «{N2_PLAIN}» → «{N2_CIPHER}»")
 
 
 # ===================================================================== N3
@@ -663,6 +665,7 @@ def write_readme():
 
 Все файлы принадлежат узлам N1–N6 (см. `bot/docs/QUEST_WALKTHROUGH.md`).
 `n1_card.jpg` шлётся как document, иначе Telegram сожмёт EXIF и хвост JPEG.
+N2 использует связанную цепочку `n2_reversed.wav` → `n2_spec.wav` → `n2_cipher.wav`.
 """,
         encoding="utf-8",
     )
