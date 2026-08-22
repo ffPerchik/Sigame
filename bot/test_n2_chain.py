@@ -33,6 +33,10 @@ class N2AudioChainTests(unittest.TestCase):
     def test_vigenere_and_fibonacci_layers_produce_final_answer(self):
         self.assertEqual(vigenere(self.PLAIN, self.KEY), self.CIPHER)
         self.assertEqual(vigenere(self.CIPHER, self.KEY, decrypt=True), self.PLAIN)
+        self.assertEqual(
+            vigenere("ЫЦЮШЕФ ЖГЩЮЙУЫ", "ключ", decrypt=True),
+            "СЛАБЫЙ ИМПУЛЬС",
+        )
         words = self.PLAIN.split()
         answer = "".join(words[index - 1][0] for index in (1, 2, 3, 5, 8, 13))
         self.assertEqual(answer, "СИГНАЛ")
