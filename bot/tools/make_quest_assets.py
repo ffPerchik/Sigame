@@ -372,7 +372,7 @@ def make_n2_sheet():
 
 def make_n2():
     make_morse_wav("КЛЮЧ", OUT / "n2_reversed.wav", reverse=True)
-    make_word_spectrogram_wav("ФИБО", OUT / "n2_spec.wav", duration=3.6)
+    make_word_spectrogram_wav("ФИБО", OUT / "n2_ызус.wav", duration=3.6)
     make_n2_sheet()
 
 
