@@ -109,6 +109,15 @@ class N2AudioChainTests(unittest.TestCase):
         )
         self.assertEqual(lines[0], "ВИЖЕНЕР")
         self.assertEqual(" ".join(lines[1:]), self.CIPHER)
+        pixel_font = next(
+            ast.literal_eval(node.value)
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "PIXEL_FONT_5x7"
+        )
+        self.assertEqual(pixel_font["Д"][-1], "10001")
+        self.assertEqual(pixel_font["Ц"][-1], "00001")
         self.assertIn("make_ballet_waltz(total_samples, sr)", source)
         self.assertIn("music * 0.92 + hidden * 0.08", source)
 
