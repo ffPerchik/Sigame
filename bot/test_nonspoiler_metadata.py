@@ -34,6 +34,35 @@ class NonSpoilerMetadataTests(unittest.TestCase):
         for category in ("бумажные шифры", "видео", "числовая логика", "цепочка шифров"):
             self.assertIn(category, node_lines)
 
+    def test_task_texts_hint_without_naming_the_method(self):
+        stages = (REPO_ROOT / "bot" / "quest" / "stages.yaml").read_text(encoding="utf-8")
+        lines = stages.splitlines()
+        task_texts = []
+        current_stage = ""
+        index = 0
+        while index < len(lines):
+            line = lines[index]
+            if line.startswith("  N") and not line.startswith("    ") and line.endswith(":"):
+                current_stage = line.strip()[:-1]
+            if current_stage.startswith(("N3_", "N4_", "N5_", "N6_")) and line == "    text: |":
+                block = []
+                index += 1
+                while index < len(lines) and (not lines[index].strip() or lines[index].startswith("      ")):
+                    block.append(lines[index].strip())
+                    index += 1
+                task_texts.append(" ".join(block).lower())
+                continue
+            index += 1
+
+        combined = "\n".join(task_texts)
+        for direct_instruction in (
+            "ключ у тебя", "зигзаг", "рельс", "виженер", "a1z26", "utf-8",
+            "вычитай", "декодируй", "пиши", "разложи", "первые пять по порядку",
+        ):
+            self.assertNotIn(direct_instruction, combined)
+        self.assertIn("первое слово всё ещё с тобой", combined)
+        self.assertIn("алфавит только с одной стороны", combined)
+
     def test_player_facing_assets_have_neutral_names(self):
         images = REPO_ROOT / "bot" / "quest" / "images"
         combined = "\n".join(
