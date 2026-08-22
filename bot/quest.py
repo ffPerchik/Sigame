@@ -1,6 +1,8 @@
-"""Загрузка квеста: пролог, ключ активации перед хабом и шесть узлов."""
+"""Загрузка квеста с безопасным автоматическим обновлением stages.yaml."""
 import re
+import time
 from collections import OrderedDict
+from pathlib import Path
 from typing import Optional
 
 import yaml
@@ -11,15 +13,67 @@ except ImportError:  # прямой запуск файлов из папки bo
     from config import QUEST_FILE
 
 _QUEST: Optional[dict] = None
+_QUEST_MTIME_NS: Optional[int] = None
+_FAILED_MTIME_NS: Optional[int] = None
+_NEXT_AUTO_CHECK = 0.0
+_AUTO_RELOAD_INTERVAL = 1.0
+
+
+def _read_from_disk() -> tuple[dict, int]:
+    path = Path(QUEST_FILE)
+    mtime_ns = path.stat().st_mtime_ns
+    with path.open(encoding="utf-8") as stream:
+        data = yaml.safe_load(stream)
+    if not isinstance(data, dict) or not isinstance(data.get("stages"), dict):
+        raise ValueError(f"В {path} нет mapping-секции 'stages'")
+    return data, mtime_ns
+
+
+def reload_from_disk() -> tuple[bool, str]:
+    """Принудительно перечитывает сценарий, не ломая старый при ошибке."""
+    global _QUEST, _QUEST_MTIME_NS, _FAILED_MTIME_NS, _NEXT_AUTO_CHECK
+    try:
+        data, mtime_ns = _read_from_disk()
+    except Exception as error:
+        try:
+            _FAILED_MTIME_NS = Path(QUEST_FILE).stat().st_mtime_ns
+        except OSError:
+            _FAILED_MTIME_NS = None
+        return False, f"{type(error).__name__}: {error}"
+
+    _QUEST = data
+    _QUEST_MTIME_NS = mtime_ns
+    _FAILED_MTIME_NS = None
+    _NEXT_AUTO_CHECK = time.monotonic() + _AUTO_RELOAD_INTERVAL
+    return True, f"стадий: {len(data['stages'])}"
 
 
 def load() -> dict:
-    global _QUEST
+    """Возвращает актуальный сценарий; mtime проверяется не чаще раза в секунду."""
+    global _NEXT_AUTO_CHECK
     if _QUEST is None:
-        with open(QUEST_FILE, encoding="utf-8") as f:
-            _QUEST = yaml.safe_load(f)
-        if "stages" not in _QUEST:
-            raise ValueError(f"В {QUEST_FILE} нет секции 'stages'")
+        ok, details = reload_from_disk()
+        if not ok:
+            raise RuntimeError(f"Не удалось загрузить сценарий: {details}")
+        return _QUEST
+
+    now = time.monotonic()
+    if now >= _NEXT_AUTO_CHECK:
+        _NEXT_AUTO_CHECK = now + _AUTO_RELOAD_INTERVAL
+        try:
+            mtime_ns = Path(QUEST_FILE).stat().st_mtime_ns
+        except OSError as error:
+            print(f"[QUEST] автообновление пропущено: {error}", flush=True)
+        else:
+            if mtime_ns != _QUEST_MTIME_NS and mtime_ns != _FAILED_MTIME_NS:
+                ok, details = reload_from_disk()
+                if ok:
+                    print(f"[QUEST] сценарий автоматически обновлён ({details})", flush=True)
+                else:
+                    print(
+                        f"[QUEST] ошибка обновления, оставлена предыдущая версия: {details}",
+                        flush=True,
+                    )
     return _QUEST
 
 

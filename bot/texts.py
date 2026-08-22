@@ -10,6 +10,7 @@ PLAYER_HELP = (
 )
 ADMIN_HELP = (
     "Команды ведущего:\n"
+    "/update — немедленно перечитать сценарий с диска\n"
     "/stats — прогресс всех игроков (+ id и баланс подсказок)\n"
     "/pending — очередь на апрув\n"
     "/addhint <@username или id> <n> — начислить игроку подсказки\n"
@@ -122,6 +123,8 @@ PENDING_HEADER = "⏳ На проверке:"
 PENDING_LINE = "#{sid} {name} (@{username}): «{stage}» — {payload}"
 
 # ============ ВЕДУЩИЙ: КОМАНДЫ ============
+UPDATE_OK = "🔄 Сценарий обновлён ({details})."
+UPDATE_FAIL = "❌ Сценарий не обновлён; продолжает работать предыдущая версия.\n{error}"
 ADDHINT_USAGE = "/addhint <@username или id> <число>  (отрицательное — списать)"
 SETHINT_USAGE = "/sethint <@username или id> <число>"
 SIGN_CREDIT = "начислено {n}"

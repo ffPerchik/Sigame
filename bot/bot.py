@@ -625,6 +625,15 @@ async def cb_rej(cq: CallbackQuery) -> None:
 
 # ======================== host commands =====================================
 
+@dp.message(HostFilter(), Command("update", "reload"))
+async def cmd_update(message: Message) -> None:
+    ok, details = quest.reload_from_disk()
+    if ok:
+        await message.answer(T.UPDATE_OK.format(details=details))
+    else:
+        await message.answer(T.UPDATE_FAIL.format(error=details))
+
+
 @dp.message(HostFilter(), Command("stats"))
 async def cmd_stats(message: Message) -> None:
     rows = db.all_players()
