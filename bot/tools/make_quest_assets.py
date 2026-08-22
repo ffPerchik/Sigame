@@ -25,6 +25,9 @@ BOT_ROOT = Path(__file__).resolve().parent.parent
 OUT = BOT_ROOT / "quest" / "images"
 OUT.mkdir(parents=True, exist_ok=True)
 
+SCRIPT_FONT = BOT_ROOT / "tools" / "fonts" / "MarckScript-Regular.ttf"
+PARCHMENT_SOURCE = BOT_ROOT / "quest" / "source" / "n3_parchment.png"
+
 FONTS = [
     str(BOT_ROOT / "tools" / "fonts" / "DejaVuSans-Bold.ttf"),
     str(BOT_ROOT / "tools" / "fonts" / "DejaVuSans.ttf"),
@@ -48,6 +51,24 @@ def font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         "Нет шрифта с кириллицей. В репо должен быть bot/tools/fonts/DejaVuSans-Bold.ttf"
     )
 
+
+def script_font(size: int) -> ImageFont.FreeTypeFont:
+    if not SCRIPT_FONT.exists():
+        raise FileNotFoundError(f"Нет каллиграфического шрифта: {SCRIPT_FONT}")
+    return ImageFont.truetype(str(SCRIPT_FONT), size)
+
+
+def parchment_page() -> Image.Image:
+    """Чистый портретный лист на основе референса пользователя."""
+    if not PARCHMENT_SOURCE.exists():
+        raise FileNotFoundError(f"Нет фона старой бумаги: {PARCHMENT_SOURCE}")
+    return Image.open(PARCHMENT_SOURCE).convert("RGB").resize((1024, 1536), Image.Resampling.LANCZOS)
+
+
+def centered_text(draw: ImageDraw.ImageDraw, text: str, y: int, text_font, fill):
+    box = draw.textbbox((0, 0), text, font=text_font)
+    width = box[2] - box[0]
+    draw.text(((1024 - width) / 2, y), text, fill=fill, font=text_font)
 
 
 def hack_glitch(
@@ -148,7 +169,14 @@ def ffmpeg() -> str | None:
 
 
 # ===================================================================== N1
-def draw_pigpen(draw: ImageDraw.ImageDraw, xy: tuple[int, int], ch: str, scale=18):
+def draw_pigpen(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[int, int],
+    ch: str,
+    scale=18,
+    color=(58, 37, 23),
+    width=3,
+):
     idx = RU.index(ch)
     kind, dotted, pos = pigpen_cell(idx)
     x, y = xy
@@ -162,16 +190,16 @@ def draw_pigpen(draw: ImageDraw.ImageDraw, xy: tuple[int, int], ch: str, scale=1
         # внешние линии в зависимости от позиции
         # top
         if r != 0:
-            draw.line((x, y, x + 2 * s, y), fill=(20, 20, 20), width=3)
+            draw.line((x, y, x + 2 * s, y), fill=color, width=width)
         # bottom
         if r != 2:
-            draw.line((x, y + 2 * s, x + 2 * s, y + 2 * s), fill=(20, 20, 20), width=3)
+            draw.line((x, y + 2 * s, x + 2 * s, y + 2 * s), fill=color, width=width)
         # left
         if c != 0:
-            draw.line((x, y, x, y + 2 * s), fill=(20, 20, 20), width=3)
+            draw.line((x, y, x, y + 2 * s), fill=color, width=width)
         # right
         if c != 2:
-            draw.line((x + 2 * s, y, x + 2 * s, y + 2 * s), fill=(20, 20, 20), width=3)
+            draw.line((x + 2 * s, y, x + 2 * s, y + 2 * s), fill=color, width=width)
     else:
         # X-семейство: два луча, ориентация по pos 0..3 обычно, у нас 0..8
         arms = [
@@ -182,9 +210,9 @@ def draw_pigpen(draw: ImageDraw.ImageDraw, xy: tuple[int, int], ch: str, scale=1
         ]
         pair = arms[pos % 4]
         for seg in pair:
-            draw.line(seg, fill=(20, 20, 20), width=3)
+            draw.line(seg, fill=color, width=width)
     if dotted:
-        draw.ellipse((cx - 3, cy - 3, cx + 3, cy + 3), fill=(20, 20, 20))
+        draw.ellipse((cx - 3, cy - 3, cx + 3, cy + 3), fill=color)
 
 
 def _n1_still() -> Image.Image:
@@ -481,50 +509,16 @@ def make_n2():
 
 # ===================================================================== N3
 def make_n3():
-    """Пигпен РЕШЕТКА → rail ВИЖНЕР → vigenere(РЕШЕТКА) СТРОФА → book ИСТИНА."""
+    """Четыре реалистичных листа: pigpen → rail → Vigenere → book cipher."""
     word1 = "РЕШЕТКА"
+    crib = "СИКСЕВЕН"
     rail_plain = "ВИЖНЕР"
     rail_c = rail_fence_enc(rail_plain, 3)
     vig_plain = "СТРОФА"
     vig_c = vigenere(vig_plain, word1)
-    # book: stanza, take (line, word) → letters
-    stanza = [
-        "Иней кроет старые камни аллеи",
-        "Свет едва касается тёмных окон",
-        "Тишина лежит на низких крышах",
-        "Ночь открывает давно забытый архив",
-    ]
-    # ИСТИНА: I need letters И С Т И Н А
-    # line1 word1 Иней → И
-    # line1 word3 старые → С
-    # line2 word1 Свет → С too
-    # Let's pick:
-    # (1,1) Иней → И
-    # (2,1) Свет → С
-    # (2,2) едва → Е — wrong
-    # Change stanza to contain ИСТИНА via first letters of selected words
-    stanza = [
-        "Иней трогает старые камни аллеи",          # 1,1 И
-        "Сад едва касается тёмных окон",            # 2,1 С
-        "Тишина лежит на низких крышах",            # 3,1 Т
-        "Иней снова на ветках",                     # 4,1 И
-        "Ночь открывает давно забытый архив",       # 5,1 Н
-        "Архив хранит последнее слово",             # 6,1 А
-    ]
-    coords = "1.1  2.1  3.1  4.1  5.1  6.1"  # too obvious
-    # mix word positions
-    stanza = [
-        "Серый иней трогает камни",                 # 1,2 иней → И
-        "В саду свет едва дышит",                    # 2,3 свет → С
-        "Под крышей тишина лежит",                   # 3,3 тишина → Т
-        "Снова иней на ветках",                      # 4,2 иней → И
-        "В этой ночи открыт архив",                  # 5,3 ночи → Н
-        "Последнее слово — архив",                   # wait А from архив 6,3
-    ]
-    # 6: "Храни архив как начало"
     stanza = [
         "Серый иней трогает камни",        # 1.2 И
-        "В саду свет едва дышит",           # 2.3 С
+        "В саду свет едва дышит",          # 2.3 С
         "Под крышей тишина лежит",          # 3.3 Т
         "Снова иней на ветках",             # 4.2 И
         "В этой ночи открыт проход",        # 5.3 Н
@@ -532,53 +526,67 @@ def make_n3():
     ]
     picks = [(1, 2), (2, 3), (3, 3), (4, 2), (5, 3), (6, 2)]
     got = []
-    for li, wi in picks:
-        w = stanza[li - 1].split()[wi - 1]
-        got.append(only_ru(w)[0])
+    for line_index, word_index in picks:
+        word = stanza[line_index - 1].split()[word_index - 1]
+        got.append(only_ru(word)[0])
     assert "".join(got) == "ИСТИНА", got
 
-    # page 1 pigpen
-    p1 = Image.new("RGB", (1100, 620), (232, 216, 190))
-    d = ImageDraw.Draw(p1)
-    d.text((36, 20), "ТЕТРАДЬ · лист I   (знаки, не буквы)", fill=(80, 50, 30), font=font(26))
-    x0 = 50
-    for i, ch in enumerate(word1):
-        draw_pigpen(d, (x0 + i * 140, 160), ch, scale=36)
-    # mini-legend for А Б В
-    d.text((36, 420), "образец (первые три клетки без точки = А Б В):", fill=(70, 60, 50), font=font(20))
-    for i, ch in enumerate("АБВ"):
-        draw_pigpen(d, (50 + i * 90, 460), ch, scale=16)
-        d.text((50 + i * 90, 530), ch, fill=(70, 60, 50), font=font(18))
-    hack_glitch(p1, seed=31, power=0.7).save(OUT / "artifact_3a.png")
+    ink = (62, 39, 23)
+    faded_ink = (92, 62, 39)
+    accent = (112, 43, 31)
 
-    p2 = Image.new("RGB", (1100, 420), (232, 216, 190))
-    d = ImageDraw.Draw(p2)
-    d.text((36, 20), "ТЕТРАДЬ · лист II   зигзаг / 3 рельса", fill=(80, 50, 30), font=font(26))
-    d.text((36, 140), rail_c, fill=(20, 20, 50), font=font(72))
-    d.text((36, 280), "Читай как железнодорожную изгородь. Три нити.", fill=(70, 60, 50), font=font(22))
-    hack_glitch(p2, seed=32).save(OUT / "artifact_3b.png")
+    # Лист I: основное слово и вертикальная известная пара СИКСЕВЕН на полях.
+    page1 = parchment_page()
+    draw = ImageDraw.Draw(page1)
+    centered_text(draw, "Лист I", 105, script_font(82), ink)
+    centered_text(draw, "знаки тоже умеют помнить слова", 215, script_font(42), faded_ink)
+    for index, letter in enumerate(word1):
+        draw_pigpen(draw, (90 + index * 120, 365), letter, scale=40, color=ink, width=4)
+    draw.line((120, 535, 900, 535), fill=faded_ink, width=2)
+    draw.text((150, 690), "проверка пера", fill=faded_ink, font=script_font(46))
+    for index, letter in enumerate(crib):
+        y = 625 + index * 92
+        draw_pigpen(draw, (690, y), letter, scale=16, color=ink, width=3)
+        draw.text((750, y - 11), f"— {letter}", fill=ink, font=script_font(44))
+    page1.save(OUT / "artifact_3a.png", optimize=True)
 
-    p3 = Image.new("RGB", (1100, 480), (232, 216, 190))
-    d = ImageDraw.Draw(p3)
-    d.text((36, 20), "ТЕТРАДЬ · лист III   ключ — то, что открыл лист I", fill=(80, 50, 30), font=font(24))
-    d.text((36, 140), vig_c, fill=(20, 20, 50), font=font(64))
-    d.text((36, 280), "Виженер. Алфавит 32 буквы, без Ё. Ключ уже у тебя.", fill=(70, 60, 50), font=font(22))
-    hack_glitch(p3, seed=33, power=0.5).save(OUT / "artifact_3c.png")
+    # Лист II: никаких названий метода — только след из трёх линий.
+    page2 = parchment_page()
+    draw = ImageDraw.Draw(page2)
+    centered_text(draw, "Лист II", 105, script_font(82), ink)
+    centered_text(draw, "строка помнит путь, которым её писали", 235, script_font(42), faded_ink)
+    centered_text(draw, rail_c, 535, script_font(132), ink)
+    for y, offset in ((850, 0), (935, 55), (1020, 0)):
+        draw.arc((145 + offset, y - 65, 880 - offset, y + 65), 185, 355, fill=faded_ink, width=3)
+    centered_text(draw, "три следа — одна строка", 1160, script_font(48), faded_ink)
+    page2.save(OUT / "artifact_3b.png", optimize=True)
 
-    p4 = Image.new("RGB", (1100, 640), (232, 216, 190))
-    d = ImageDraw.Draw(p4)
-    d.text((36, 16), "ТЕТРАДЬ · лист IV   книжный шифр", fill=(80, 50, 30), font=font(26))
-    for i, line in enumerate(stanza):
-        d.text((48, 80 + i * 48), f"{i + 1}.  {line}", fill=(20, 20, 40), font=font(26))
-    coord_s = "  ".join(f"{a}.{b}" for a, b in picks)
-    d.text((48, 420), coord_s, fill=(140, 30, 30), font=font(36))
-    d.text((48, 500), "строка.слово  →  первая буква каждого слова", fill=(70, 60, 50), font=font(22))
-    hack_glitch(p4, seed=34).save(OUT / "artifact_3d.png")
+    # Лист III: предыдущий ответ подсказывает способ, первый — повторяющееся слово.
+    page3 = parchment_page()
+    draw = ImageDraw.Draw(page3)
+    centered_text(draw, "Лист III", 105, script_font(82), ink)
+    centered_text(draw, "на полях: «первое слово всё ещё с тобой»", 245, script_font(40), faded_ink)
+    centered_text(draw, vig_c, 610, script_font(142), ink)
+    draw.line((210, 830, 815, 830), fill=faded_ink, width=2)
+    centered_text(draw, "повторяй, пока строка не заговорит", 910, script_font(46), faded_ink)
+    page3.save(OUT / "artifact_3c.png", optimize=True)
 
-    print(f"  N3  pigpen {word1}")
+    # Лист IV: книжные координаты остаются частью самого рукописного листа.
+    page4 = parchment_page()
+    draw = ImageDraw.Draw(page4)
+    centered_text(draw, "Лист IV", 95, script_font(82), ink)
+    centered_text(draw, "шесть строк из старого архива", 205, script_font(42), faded_ink)
+    for index, line in enumerate(stanza, start=1):
+        draw.text((145, 330 + (index - 1) * 125), f"{index}.  {line}", fill=ink, font=script_font(48))
+    coordinates = "   ".join(f"{line}.{word}" for line, word in picks)
+    centered_text(draw, coordinates, 1110, script_font(60), accent)
+    centered_text(draw, "две цифры — два шага", 1235, script_font(46), faded_ink)
+    page4.save(OUT / "artifact_3d.png", optimize=True)
+
+    print(f"  N3  pigpen {word1}; crib {crib}")
     print(f"  N3  rail {rail_plain} → {rail_c}")
     print(f"  N3  vig key={word1} {vig_plain} → {vig_c}")
-    print(f"  N3  book {coord_s} → {''.join(got)}")
+    print(f"  N3  book {coordinates} → {''.join(got)}")
 
 
 # ===================================================================== N4
@@ -769,6 +777,7 @@ def write_readme():
 N2 использует связанную цепочку `n2_1.wav` → `n2_2.wav` → `n2_3.wav`;
 в последнем файле скрытая спектрограмма наложена на слышимый вальс.
 Файлы N3–N6 называются нейтрально (`artifact_*`), чтобы имя не выдавало метод решения.
+N3 собирается на фоне `quest/source/n3_parchment.png` шрифтом Marck Script (SIL OFL 1.1).
 """,
         encoding="utf-8",
     )
