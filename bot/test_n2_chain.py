@@ -99,6 +99,8 @@ class N2AudioChainTests(unittest.TestCase):
         )
         self.assertEqual(lines[0], "ВИЖЕНЕР")
         self.assertEqual(" ".join(lines[1:]), self.CIPHER)
+        self.assertIn("make_ballet_waltz(total_samples, sr)", source)
+        self.assertIn("music * 0.92 + hidden * 0.08", source)
 
 
 if __name__ == "__main__":

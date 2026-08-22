@@ -326,13 +326,73 @@ def make_fibonacci_rhythm_wav(out: Path, sr: int = 22050):
     print(f"  N2  {out.name}  rhythm groups={counts}")
 
 
+def make_ballet_waltz(total_samples: int, sr: int = 22050) -> np.ndarray:
+    """Короткий оригинальный вальс в духе балетной музыкальной шкатулки."""
+    audio = np.zeros(total_samples, dtype=np.float32)
+    beat = 0.5  # 120 BPM, размер 3/4; восемь тактов занимают 12 секунд
+
+    def add_note(start: float, duration: float, midi: int, amplitude: float):
+        first = int(start * sr)
+        count = min(int(duration * sr), total_samples - first)
+        if count <= 0:
+            return
+        time = np.arange(count) / sr
+        frequency = 440.0 * 2 ** ((midi - 69) / 12)
+        tone = (
+            np.sin(2 * np.pi * frequency * time)
+            + 0.28 * np.sin(2 * np.pi * frequency * 2 * time)
+            + 0.10 * np.sin(2 * np.pi * frequency * 3 * time)
+        )
+        attack = max(1, int(min(0.035, duration / 4) * sr))
+        release = max(1, int(min(0.16, duration / 3) * sr))
+        envelope = np.ones(count, dtype=np.float32)
+        envelope[:attack] = np.linspace(0, 1, attack)
+        envelope[-release:] *= np.linspace(1, 0, release)
+        audio[first:first + count] += (tone * envelope * amplitude).astype(np.float32)
+
+    chords = [
+        (45, 52, 57),  # A minor
+        (50, 57, 62),  # D minor
+        (52, 59, 68),  # E major
+        (45, 52, 57),
+        (41, 48, 53),  # F major
+        (50, 57, 62),
+        (52, 59, 68),
+        (45, 52, 57),
+    ]
+    melody = [
+        69, 72, 76, 81, 79, 76, 74, 77, 81, 80, 76, 71,
+        72, 69, 72, 74, 77, 76, 71, 76, 80, 81, 76, 69,
+    ]
+    for bar, chord in enumerate(chords):
+        bar_start = bar * 3 * beat
+        add_note(bar_start, beat * 0.92, chord[0], 0.30)
+        for beat_index in (1, 2):
+            start = bar_start + beat_index * beat
+            for note in chord[1:]:
+                add_note(start, beat * 0.78, note, 0.13)
+        for beat_index in range(3):
+            add_note(
+                bar_start + beat_index * beat,
+                beat * 0.88,
+                melody[bar * 3 + beat_index],
+                0.22,
+            )
+
+    # Небольшое эхо смягчает синтез, но не заходит в частоты скрытого текста.
+    for delay, gain in ((int(sr * 0.18), 0.20), (int(sr * 0.36), 0.10)):
+        audio[delay:] += audio[:-delay] * gain
+    peak = np.max(np.abs(audio)) or 1
+    return audio / peak
+
+
 def make_multiline_spectrogram_wav(
     lines: tuple[str, ...],
     out: Path,
     duration: float = 12.0,
     sr: int = 22050,
 ):
-    """Рисует несколько строк 5×7-шрифтом в спектрограмме WAV."""
+    """Прячет несколько строк спектрограммы под слышимым вальсом."""
     lines = tuple(line.upper().replace("Ё", "Е") for line in lines)
     cols = max(len(line) * 6 - 1 for line in lines)
     rows = len(lines) * 9 - 2
@@ -367,14 +427,19 @@ def make_multiline_spectrogram_wav(
     samples_per_column = max(int(sr * duration / n_time), 32)
     total_samples = samples_per_column * n_time
     timeline = np.arange(total_samples) / sr
-    frequencies = 450 + np.arange(n_freq) * (8550 / max(n_freq - 1, 1))
-    audio = np.zeros(total_samples, dtype=np.float32)
+    # Музыка остаётся ниже ~2.5 кГц, а скрытые буквы занимают отдельную верхнюю
+    # полосу. Поэтому в обычном проигрывателе слышен вальс, а не цифровой шум.
+    frequencies = 4200 + np.arange(n_freq) * (5600 / max(n_freq - 1, 1))
+    hidden = np.zeros(total_samples, dtype=np.float32)
     for frequency_index in np.flatnonzero(target.any(axis=1)):
         envelope = np.repeat(target[frequency_index], samples_per_column)
         carrier = np.sin(2 * np.pi * frequencies[frequency_index] * timeline)
-        audio += (carrier * envelope).astype(np.float32)
+        hidden += (carrier * envelope).astype(np.float32)
+    hidden /= np.max(np.abs(hidden)) or 1
+    music = make_ballet_waltz(total_samples, sr)
+    audio = music * 0.92 + hidden * 0.08
     _write_wav(out, audio, sr)
-    print(f"  N2  {out.name}  spectrogram lines={lines}")
+    print(f"  N2  {out.name}  waltz + spectrogram lines={lines}")
 
 
 N2_KEY = "КЛЮЧ"
@@ -684,7 +749,8 @@ def write_readme():
 
 Все файлы принадлежат узлам N1–N6 (см. `bot/docs/QUEST_WALKTHROUGH.md`).
 `n1_card.jpg` шлётся как document, иначе Telegram сожмёт EXIF и хвост JPEG.
-N2 использует связанную цепочку `n2_reversed.wav` → `n2_fibo.wav` → `n2_cipher.wav`.
+N2 использует связанную цепочку `n2_reversed.wav` → `n2_fibo.wav` → `n2_cipher.wav`;
+в последнем файле скрытая спектрограмма наложена на слышимый вальс.
 """,
         encoding="utf-8",
     )
