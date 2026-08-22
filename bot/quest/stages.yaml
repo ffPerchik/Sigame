@@ -50,16 +50,16 @@ stages:
   a_1:
     mode: info
     messages:
-      - {speaker: argus, delay: 1.5, text: "NETWORK INTERFACE: ACTIVE"}
-      - {speaker: argus, delay: 1.5, text: "ESTABLISHING SECURE HANDSHAKE…"}
-      - {speaker: argus, delay: 1.5, text: "HANDSHAKE ACCEPTED"}
-      - {speaker: argus, delay: 1.5, text: "VOICE CHANNEL TEST: …ТЫ СЛЫШИШЬ НАС?"}
+      - {speaker: argus, delay: 1, text: "NETWORK INTERFACE: ACTIVE"}
+      - {speaker: argus, delay: 1, text: "ESTABLISHING SECURE HANDSHAKE…"}
+      - {speaker: argus, delay: 1, text: "HANDSHAKE ACCEPTED"}
+      - {speaker: argus, delay: 1, text: "VOICE CHANNEL TEST: …ТЫ СЛЫШИШЬ НАС?"}
     next: z_2
 
   z_2:
     mode: auto
     speaker: zhenya
-    delay: 3
+    delay: 6
     text: |
       ээ-м... это не я писал... лаг какой-то... Да ладно, неважно
 
@@ -99,15 +99,15 @@ stages:
   a_3:
     mode: info
     messages:
-      - {speaker: argus, delay: 1.5, text: "CHANNEL INJECTION: 50%"}
-      - {speaker: argus, delay: 1.5, text: "WARNING: UNUSUAL ACTIVITY DETECTED"}
-      - {speaker: argus, delay: 1.5, text: "HOST PROCESS «kolysheev» IS ATTEMPTING RESTART"}
-      - {speaker: argus, delay: 1.5, text: "RESTART EMITATION: STARTED"}
+      - {speaker: argus, delay: 1, text: "CHANNEL INJECTION: 50%"}
+      - {speaker: argus, delay: 1, text: "WARNING: UNUSUAL ACTIVITY DETECTED"}
+      - {speaker: argus, delay: 1, text: "HOST PROCESS «kolysheev» IS ATTEMPTING RESTART"}
+      - {speaker: argus, delay: 1, text: "RESTART EMITATION: STARTED"}
     next: bot_1
 
   bot_1:
     mode: auto
-    delay: 10
+    delay: 4
     text: |
       🤖 Бот @Zengame_checker_bot запущен. HOST=k@ly$%ev. Жду команд.
     accept:
@@ -122,7 +122,7 @@ stages:
     speaker: zhenya
     delay: 1.5
     text: |
-      Я откатываю апдейт, не пишите в чат что это «взлом». Просто баг. Просто баг, Женя... Просто баг...
+      Я откатываю апдейт, даже не смей писать, что это какой-то «взлом». Просто баг. Просто баг, Женя... Просто баг...
     accept:
       - "взлом"
       - "взлом"
@@ -138,7 +138,7 @@ stages:
       - {speaker: argus, delay: 1.5, text: "CHANNEL OVERWRITE: 100%"}
       - {speaker: argus, delay: 1.5, text: "ПЕРЕДАЧА ПЕРЕХВАЧЕНА"}
       - {speaker: argus, delay: 1.5, text: "ИГРОК, НЕ ЗАКРЫВАЙ СОЕДИНЕНИЕ. ОСТАЛСЯ ОДИН ШАГ."}
-      - {speaker: zhenya, delay: 2.5, text: "нет нет нет подож——"}
+      - {speaker: zhenya, delay: 3.5, text: "нет нет нет подож——"}
       - {speaker: argus, delay: 0, text: "TERMINATING HOST SESSION…"}
       - {speaker: argus, delay: 1.5, text: "CONNECTION OWNER: ARGVS-1001"}
       - {speaker: argus, delay: 1.5, text: "ЖЕНИ БОЛЬШЕ НЕТ"}
@@ -161,9 +161,9 @@ stages:
     correct_text: ""
     wrong_argus: "Ключ отклонён, ты недостоен, но мы дадим тебе ещё 1 шанс, так и быть. (Если ты не играл в sigame, напиши Жене, что ты дошёл до этого этапа)"
     messages:
-      - {speaker: argus, delay: 0.5, text: "Что же, теперь сеанс наш, можно расслабиться"}
-      - {speaker: argus, delay: 0.5, text: "Для начала мы хотим проверить, что ты не безнадёжен"}
-      - {speaker: argus, delay: 0.5, text: "Введи ключ, докажи нам, что с тобой можно работать. Мы запрятали его там, где ты был недавно."}
+      - {speaker: argus, delay: 1, text: "Что же, теперь сеанс наш, можно расслабиться"}
+      - {speaker: argus, delay: 1, text: "Для начала мы хотим проверить, что ты не безнадёжен"}
+      - {speaker: argus, delay: 1, text: "Введи ключ, докажи нам, что с тобой можно работать. Мы запрятали его там, где ты был недавно."}
     hint: |
       Ключ спрятан внутри zengame.siq.
     next: quest_unlocked
@@ -174,7 +174,27 @@ stages:
       - {speaker: argus, delay: 0.5, text: "ACTIVATION KEY ACCEPTED"}
       - {speaker: argus, delay: 0.5, text: "ДОСТУП К ШЕСТИ УЗЛАМ РАЗРЕШЁН"}
       - {speaker: argus, delay: 3, text: "Мы свяжемся с тобой, когда придёт время"}
+    next: helper
+
+  helper:
+    mode: info
+    text: |
+      ℹ️ℹ️ℹ️ℹ️ℹ️INFOℹ️ℹ️ℹ️ℹ️ℹ️
+      На связи helper. Я тут только чтобы рассказать вам правила, по которым тут всё работает.
+
+      Следующее сообщение представляет из себя HUB. Это слой, который позволяет вам отслеживать ваш прогресс.
+      Также, у вас есть возможность выбрать порядок, в котором вы будите решать загадки. При этом, после выбора слоя, у вас НЕ БУДЕТ возможности перейти на другой слой до завершения этого.
+      Поэтому с умом читайте микроописание каждого слоя, чтобы идти в наилучшем для вас порядке.
+
+      У вас есть подсказки (/hint). Они не бесконечны, но могут быть заработаны. Я не скажу вам за какие действия это происходит, быть может если написать "sixseven", то дадут подсказку, кто знает... А может их вообще нет...)
+
+      Если вы потерялись, забыли, сколько у вас подсказок, ну или вас ударила амнезия и вы забыли вопрос, который прочитали 3 секунды назад... - команда /progress решит все ваши проблемы
+
+      P.S. Возможно, если окончить игру с числом подсказок > 0, то что-то будет)
+
+
     next: hub
+
 
   # ============================== N1 ==============================
   N1_intro:

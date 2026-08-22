@@ -203,13 +203,16 @@ def make_n1():
     img = hack_glitch(_n1_still(), seed=1001, keep_rect=(780, 250, 1180, 560))
     msg = a1z26_encode("СЛОИ")
     jpg_path = OUT / "n1_card.jpg"
+    import piexif.helper
     exif_dict = {
         "0th": {
-            piexif.ImageIFD.Artist: "255,217".encode("ascii"),
+            piexif.ImageIFD.Artist: "255,217",
         },
         "Exif": {
-            piexif.ExifIFD.UserComment: b"UNICODE\x00\x00"
-            + 'Ищи "secret code" в битах'.encode("utf-16le"),
+            piexif.ExifIFD.UserComment: piexif.helper.UserComment.dump(
+                'Ищи "secret code" в битах',
+                encoding="unicode",
+            ),
         },
     }
     img.save(jpg_path, "JPEG", quality=92, exif=piexif.dump(exif_dict))
