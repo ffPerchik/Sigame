@@ -1,4 +1,5 @@
 import ast
+import math
 import sys
 import unittest
 import wave
@@ -56,7 +57,7 @@ class N2AudioChainTests(unittest.TestCase):
         self.assertIn('      - "СИГНАЛ"', stages)
         self.assertNotIn("n2_spec.wav", stages)
 
-    def test_rhythm_audio_encodes_fibonacci_counts(self):
+    def test_phone_tones_encode_fibonacci_digits(self):
         channels, width, rate, _frames, samples = self._read_wav("n2_2.wav")
         self.assertEqual((channels, width, rate), (1, 2, 22050))
 
@@ -67,28 +68,39 @@ class N2AudioChainTests(unittest.TestCase):
             block = samples[start:start + frame_size]
             active.append(sum(value * value for value in block) / frame_size > threshold_squared)
 
-        runs = []
-        current = active[0]
-        length = 0
-        for value in active:
-            if value == current:
-                length += 1
-            else:
-                runs.append((current, length))
-                current, length = value, 1
-        runs.append((current, length))
+        tone_ranges = []
+        start = None
+        for index, is_tone in enumerate(active + [False]):
+            if is_tone and start is None:
+                start = index
+            elif not is_tone and start is not None:
+                tone_ranges.append((start * frame_size, index * frame_size))
+                start = None
+        self.assertEqual(len(tone_ranges), 6)
 
-        groups = []
-        pulse_count = 0
-        for is_tone, run_length in runs:
-            if is_tone:
-                pulse_count += 1
-            elif run_length >= 30 and pulse_count:
-                groups.append(pulse_count)
-                pulse_count = 0
-        if pulse_count:
-            groups.append(pulse_count)
-        self.assertEqual(groups, [1, 1, 2, 3, 5, 8])
+        def goertzel_power(values, frequency):
+            coefficient = 2 * math.cos(2 * math.pi * frequency / rate)
+            previous = previous2 = 0.0
+            for value in values:
+                current = value + coefficient * previous - previous2
+                previous2, previous = previous, current
+            return previous2 ** 2 + previous ** 2 - coefficient * previous * previous2
+
+        rows = (697, 770, 852, 941)
+        columns = (1209, 1336, 1477)
+        keypad = {
+            (697, 1209): "1", (697, 1336): "2", (697, 1477): "3",
+            (770, 1209): "4", (770, 1336): "5", (770, 1477): "6",
+            (852, 1209): "7", (852, 1336): "8", (852, 1477): "9",
+            (941, 1336): "0",
+        }
+        decoded = []
+        for first, last in tone_ranges:
+            values = samples[first:last]
+            row = max(rows, key=lambda frequency: goertzel_power(values, frequency))
+            column = max(columns, key=lambda frequency: goertzel_power(values, frequency))
+            decoded.append(keypad[(row, column)])
+        self.assertEqual("".join(decoded), "112358")
 
     def test_cipher_is_short_multiline_spectrogram(self):
         channels, width, rate, frames, _samples = self._read_wav("n2_3.wav")

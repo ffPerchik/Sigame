@@ -308,23 +308,39 @@ def make_morse_wav(text: str, out: Path, reverse: bool = False, sr: int = 22050)
     print(f"  N2  {out.name}  morse «{text}» reverse={reverse}")
 
 
-def make_fibonacci_rhythm_wav(out: Path, sr: int = 22050):
-    """Шесть групп импульсов: 1, 1, 2, 3, 5, 8."""
-    counts = (1, 1, 2, 3, 5, 8)
-    pulse_n = int(sr * 0.08)
-    short_gap = np.zeros(int(sr * 0.10), dtype=np.float32)
-    group_gap = np.zeros(int(sr * 0.65), dtype=np.float32)
-    t = np.arange(pulse_n) / sr
-    pulse = (np.sin(2 * np.pi * 920 * t) * np.hanning(pulse_n)).astype(np.float32)
-    chunks = [np.zeros(int(sr * 0.25), dtype=np.float32)]
-    for count in counts:
-        for index in range(count):
-            chunks.append(pulse)
-            if index + 1 < count:
-                chunks.append(short_gap)
-        chunks.append(group_gap)
+DTMF_FREQUENCIES = {
+    "1": (697, 1209), "2": (697, 1336), "3": (697, 1477),
+    "4": (770, 1209), "5": (770, 1336), "6": (770, 1477),
+    "7": (852, 1209), "8": (852, 1336), "9": (852, 1477),
+    "0": (941, 1336),
+}
+N2_DTMF_DIGITS = "112358"
+
+
+def make_dtmf_sequence_wav(out: Path, sr: int = 22050):
+    """Телефонными DTMF-сигналами набирает 1-1-2-3-5-8."""
+    tone_seconds = 0.26
+    gap_seconds = 0.12
+    tone_samples = int(sr * tone_seconds)
+    gap = np.zeros(int(sr * gap_seconds), dtype=np.float32)
+    edge = max(1, int(sr * 0.015))
+    envelope = np.ones(tone_samples, dtype=np.float32)
+    envelope[:edge] = np.linspace(0, 1, edge)
+    envelope[-edge:] = np.linspace(1, 0, edge)
+    time = np.arange(tone_samples) / sr
+    chunks = [np.zeros(int(sr * 0.20), dtype=np.float32)]
+    for index, digit in enumerate(N2_DTMF_DIGITS):
+        low, high = DTMF_FREQUENCIES[digit]
+        tone = 0.5 * (
+            np.sin(2 * np.pi * low * time)
+            + np.sin(2 * np.pi * high * time)
+        )
+        chunks.append((tone * envelope).astype(np.float32))
+        if index + 1 < len(N2_DTMF_DIGITS):
+            chunks.append(gap)
+    chunks.append(np.zeros(int(sr * 0.20), dtype=np.float32))
     _write_wav(out, np.concatenate(chunks), sr)
-    print(f"  N2  {out.name}  rhythm groups={counts}")
+    print(f"  N2  {out.name}  DTMF digits={N2_DTMF_DIGITS}")
 
 
 def make_ballet_waltz(total_samples: int, sr: int = 22050) -> np.ndarray:
@@ -456,9 +472,9 @@ assert " ".join(N2_SPECTROGRAM_LINES[1:]) == N2_CIPHER
 
 
 def make_n2():
-    """Реверс-Морзе КЛЮЧ → ритм ФИБО → спектрограмма-шифртекст → СИГНАЛ."""
+    """Реверс-Морзе КЛЮЧ → DTMF 112358 → спектрограмма-шифртекст → СИГНАЛ."""
     make_morse_wav(N2_KEY, OUT / "n2_1.wav", reverse=True)
-    make_fibonacci_rhythm_wav(OUT / "n2_2.wav")
+    make_dtmf_sequence_wav(OUT / "n2_2.wav")
     make_multiline_spectrogram_wav(N2_SPECTROGRAM_LINES, OUT / "n2_3.wav")
     print(f"  N2  vigenere-33(Ё) key={N2_KEY}: «{N2_PLAIN}» → «{N2_CIPHER}»")
 
