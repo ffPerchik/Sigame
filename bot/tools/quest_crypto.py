@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 RU = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
+RU_WITH_YO = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
 assert len(RU) == 32
+assert len(RU_WITH_YO) == 33
 
 
 def only_ru(s: str) -> str:
@@ -43,19 +45,24 @@ def atbash(text: str) -> str:
     return "".join(out)
 
 
-def vigenere(text: str, key: str, decrypt: bool = False) -> str:
-    key = only_ru(key)
+def vigenere(text: str, key: str, decrypt: bool = False, alphabet: str = RU) -> str:
+    """Виженер с выбираемым алфавитом; по умолчанию прежние 32 буквы без Ё."""
+    def normalize(ch: str) -> str:
+        up = ch.upper()
+        return "Е" if up == "Ё" and "Ё" not in alphabet else up
+
+    normalized_key = "".join(normalize(ch) for ch in key if normalize(ch) in alphabet)
     ki = 0
     out = []
     for ch in text:
-        up = ch.upper().replace("Ё", "Е")
-        if up not in RU:
+        up = normalize(ch)
+        if up not in alphabet:
             out.append(ch)
             continue
-        shift = RU.index(key[ki % len(key)])
+        shift = alphabet.index(normalized_key[ki % len(normalized_key)])
         if decrypt:
             shift = -shift
-        out.append(RU[(RU.index(up) + shift) % 32])
+        out.append(alphabet[(alphabet.index(up) + shift) % len(alphabet)])
         ki += 1
     return "".join(out)
 

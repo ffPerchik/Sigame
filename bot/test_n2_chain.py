@@ -9,13 +9,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from bot.tools.quest_crypto import vigenere
+from bot.tools.quest_crypto import RU_WITH_YO, vigenere
 
 
 class N2AudioChainTests(unittest.TestCase):
     KEY = "КЛЮЧ"
     PLAIN = "СЛАБЫЙ ИМПУЛЬС ГАСНЕТ НО НОЧНОЙ ЭФИР ЕЩЕ АККУРАТНО ХРАНИТ ЕГО ПОД СЛОЕМ ЛЬДА"
-    CIPHER = "ЫЦЮШЕФ ЖГЩЮЙУЫ ОЮИЧРР ДШ ШМОЧЩЗ ФЮУО ЬГР ЮБФЮОЧЬШМ МЪЛЛЯЬ РБЕ ЩЩВ ИХЩГГ ХЗВЧ"
+    CIPHER = "ЬЧЮШЁХ ЖДЪЯЙУЬ ОЮИШРР ЕЩ ЩМОШЪЗ ФЯФО ЬДР ЮВХЯОЧЭЩМ МЫЛЛАЭ РБЁ ЪЪВ ИЦЪГД ЦЗВЧ"
 
     @staticmethod
     def _read_wav(name):
@@ -31,10 +31,16 @@ class N2AudioChainTests(unittest.TestCase):
         return channels, width, rate, frames, samples
 
     def test_vigenere_and_fibonacci_layers_produce_final_answer(self):
-        self.assertEqual(vigenere(self.PLAIN, self.KEY), self.CIPHER)
-        self.assertEqual(vigenere(self.CIPHER, self.KEY, decrypt=True), self.PLAIN)
         self.assertEqual(
-            vigenere("ЫЦЮШЕФ ЖГЩЮЙУЫ", "ключ", decrypt=True),
+            vigenere(self.PLAIN, self.KEY, alphabet=RU_WITH_YO),
+            self.CIPHER,
+        )
+        self.assertEqual(
+            vigenere(self.CIPHER, self.KEY, decrypt=True, alphabet=RU_WITH_YO),
+            self.PLAIN,
+        )
+        self.assertEqual(
+            vigenere("ЬЧЮШЁХ ЖДЪЯЙУЬ", "ключ", decrypt=True, alphabet=RU_WITH_YO),
             "СЛАБЫЙ ИМПУЛЬС",
         )
         words = self.PLAIN.split()

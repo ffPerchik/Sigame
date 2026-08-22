@@ -12,12 +12,12 @@ from PIL import Image, ImageDraw, ImageFont
 
 try:
     from .quest_crypto import (
-        RU, a1z26_encode, atbash, only_ru, pigpen_cell,
+        RU, RU_WITH_YO, a1z26_encode, atbash, only_ru, pigpen_cell,
         rail_fence_enc, vigenere,
     )
 except ImportError:  # запуск как `python bot/tools/make_quest_assets.py`
     from quest_crypto import (
-        RU, a1z26_encode, atbash, only_ru, pigpen_cell,
+        RU, RU_WITH_YO, a1z26_encode, atbash, only_ru, pigpen_cell,
         rail_fence_enc, vigenere,
     )
 
@@ -235,6 +235,7 @@ PIXEL_FONT_5x7: dict[str, list[str]] = {
     "Г": ["11111", "10000", "10000", "10000", "10000", "10000", "10000"],
     "Д": ["01110", "10001", "10001", "10001", "10001", "10001", "11111"],
     "Е": ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
+    "Ё": ["01010", "11111", "10000", "11110", "10000", "10000", "11111"],
     "Ж": ["10001", "10101", "01010", "00100", "01010", "10101", "10001"],
     "З": ["01110", "10001", "00001", "00110", "00001", "10001", "01110"],
     "И": ["10001", "10001", "10011", "10101", "11001", "10001", "10001"],
@@ -393,7 +394,7 @@ def make_multiline_spectrogram_wav(
     sr: int = 22050,
 ):
     """Прячет несколько строк спектрограммы под слышимым вальсом."""
-    lines = tuple(line.upper().replace("Ё", "Е") for line in lines)
+    lines = tuple(line.upper() for line in lines)
     cols = max(len(line) * 6 - 1 for line in lines)
     rows = len(lines) * 9 - 2
     canvas = np.zeros((rows, cols), dtype=np.float32)
@@ -444,12 +445,12 @@ def make_multiline_spectrogram_wav(
 
 N2_KEY = "КЛЮЧ"
 N2_PLAIN = "СЛАБЫЙ ИМПУЛЬС ГАСНЕТ НО НОЧНОЙ ЭФИР ЕЩЕ АККУРАТНО ХРАНИТ ЕГО ПОД СЛОЕМ ЛЬДА"
-N2_CIPHER = vigenere(N2_PLAIN, N2_KEY)
+N2_CIPHER = vigenere(N2_PLAIN, N2_KEY, alphabet=RU_WITH_YO)
 N2_SPECTROGRAM_LINES = (
     "ВИЖЕНЕР",
-    "ЫЦЮШЕФ ЖГЩЮЙУЫ ОЮИЧРР ДШ",
-    "ШМОЧЩЗ ФЮУО ЬГР ЮБФЮОЧЬШМ",
-    "МЪЛЛЯЬ РБЕ ЩЩВ ИХЩГГ ХЗВЧ",
+    "ЬЧЮШЁХ ЖДЪЯЙУЬ ОЮИШРР ЕЩ",
+    "ЩМОШЪЗ ФЯФО ЬДР ЮВХЯОЧЭЩМ",
+    "МЫЛЛАЭ РБЁ ЪЪВ ИЦЪГД ЦЗВЧ",
 )
 assert " ".join(N2_SPECTROGRAM_LINES[1:]) == N2_CIPHER
 
@@ -459,7 +460,7 @@ def make_n2():
     make_morse_wav(N2_KEY, OUT / "n2_reversed.wav", reverse=True)
     make_fibonacci_rhythm_wav(OUT / "n2_fibo.wav")
     make_multiline_spectrogram_wav(N2_SPECTROGRAM_LINES, OUT / "n2_cipher.wav")
-    print(f"  N2  vigenere key={N2_KEY}: «{N2_PLAIN}» → «{N2_CIPHER}»")
+    print(f"  N2  vigenere-33(Ё) key={N2_KEY}: «{N2_PLAIN}» → «{N2_CIPHER}»")
 
 
 # ===================================================================== N3
