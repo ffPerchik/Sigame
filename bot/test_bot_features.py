@@ -51,14 +51,33 @@ class HintSequenceTests(unittest.TestCase):
         db.reset_hint_usage(42)
         self.assertEqual(db.consume_hint(42, "N3_pig", 2), ("ok", 0, 0))
 
+    def test_username_lookup_accepts_at_sign_and_ignores_case(self):
+        self.assertEqual(db.find_by_username("@PLAYER"), 42)
+        self.assertEqual(db.find_by_username("unknown"), None)
+
 
 class HostFeatureWiringTests(unittest.TestCase):
+    def setUp(self):
+        self.source = (REPO_ROOT / "bot" / "bot.py").read_text(encoding="utf-8")
+
     def test_direct_messages_and_answer_relay_are_wired(self):
-        source = (REPO_ROOT / "bot" / "bot.py").read_text(encoding="utf-8")
-        self.assertIn('Command("msg", "message")', source)
-        self.assertIn("HOST_MESSAGE_PLAYER", source)
-        self.assertIn("ANSWER_ATTEMPT_HOST", source)
-        self.assertIn('db.log_event(uid, "answer_attempt"', source)
+        self.assertIn('Command("msg", "message")', self.source)
+        self.assertIn("HOST_MESSAGE_PLAYER", self.source)
+        self.assertIn("ANSWER_ATTEMPT_HOST", self.source)
+        self.assertIn('db.log_event(uid, "answer_attempt"', self.source)
+
+    def test_setstage_and_reset_use_shared_username_resolver(self):
+        setstage = self.source.split("async def cmd_setstage", 1)[1].split("async def cmd_message_player", 1)[0]
+        reset = self.source.split("async def cmd_reset", 1)[1].split("async def cmd_approve", 1)[0]
+        self.assertIn("uid = _resolve(args[0])", setstage)
+        self.assertIn("uid = _resolve(args[0])", reset)
+        self.assertIn("if quest.is_info(stage):", setstage)
+
+    def test_pending_includes_gate_players_with_accept_buttons(self):
+        pending = self.source.split("async def cmd_pending", 1)[1].split("async def cmd_addhint", 1)[0]
+        self.assertIn("gates = _pending_gate_players()", pending)
+        self.assertIn("PENDING_GATE_LINE", pending)
+        self.assertIn("_gate_keyboard(player[\"user_id\"], stage_id)", pending)
 
 
 if __name__ == "__main__":

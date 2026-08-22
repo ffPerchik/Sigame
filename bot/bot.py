@@ -145,6 +145,26 @@ def _name(p) -> str:
     return f"{p['name']} (@{p['username'] or '—'})"
 
 
+def _gate_keyboard(uid: int, stage_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text=T.GATE_ACCEPT_BUTTON,
+            callback_data=f"gate_accept:{uid}:{stage_id}",
+        ),
+    ]])
+
+
+def _pending_gate_players() -> list[tuple[object, str]]:
+    """Гейты хранятся самим текущим stage игрока и переживают рестарт бота."""
+    result = []
+    for player in db.all_players():
+        stage_id = str(player["stage"] or "")
+        stage = quest.get_stage(stage_id)
+        if stage and stage.get("mode") == "gate":
+            result.append((player, stage_id))
+    return result
+
+
 async def _request_gate_approval(uid: int, stage_id: str) -> None:
     """Ждёт ручного Accept либо автоматически открывает гейт в HOST_CONSOLE."""
     player = db.get_player(uid)
@@ -156,17 +176,11 @@ async def _request_gate_approval(uid: int, stage_id: str) -> None:
         await advance(uid)
         return
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(
-            text=T.GATE_ACCEPT_BUTTON,
-            callback_data=f"gate_accept:{uid}:{stage_id}",
-        ),
-    ]])
     try:
         await bot.send_message(
             cfg.HOST_ID,
             T.GATE_APPROVAL_HOST.format(name=name, stage=stage_id),
-            reply_markup=keyboard,
+            reply_markup=_gate_keyboard(uid, stage_id),
         )
     except Exception as error:
         _host_print(T.GATE_APPROVAL_FAIL.format(name=name, err=error))
@@ -656,15 +670,24 @@ async def cmd_stats(message: Message) -> None:
 
 @dp.message(HostFilter(), Command("pending"))
 async def cmd_pending(message: Message) -> None:
-    rows = db.pending()
-    if not rows:
+    submissions = db.pending()
+    gates = _pending_gate_players()
+    if not submissions and not gates:
         return await message.answer(T.PENDING_EMPTY)
-    lines = [T.PENDING_HEADER]
-    for r in rows:
-        lines.append(T.PENDING_LINE.format(
-            sid=r["id"], name=r["name"], username=r["username"] or "—",
-            stage=r["stage"], payload=r["payload"] or r["kind"]))
-    await message.answer("\n".join(lines))
+
+    if submissions:
+        lines = [T.PENDING_HEADER]
+        for row in submissions:
+            lines.append(T.PENDING_LINE.format(
+                sid=row["id"], name=row["name"], username=row["username"] or "—",
+                stage=row["stage"], payload=row["payload"] or row["kind"]))
+        await message.answer("\n".join(lines))
+
+    for player, stage_id in gates:
+        await message.answer(
+            T.PENDING_GATE_LINE.format(name=_name(player), stage=stage_id),
+            reply_markup=_gate_keyboard(player["user_id"], stage_id),
+        )
 
 
 @dp.message(HostFilter(), Command("addhint"))
@@ -715,12 +738,16 @@ async def cmd_setstage(message: Message, command: Command) -> None:
     args = (command.args or "").split()
     if len(args) < 2:
         return await message.answer(T.SETSTAGE_USAGE)
-    uid, stage = int(args[0]), args[1]
+    uid = _resolve(args[0])
+    if not uid:
+        return await message.answer(T.PLAYER_NOT_FOUND)
+    stage = args[1]
     if not quest.get_stage(stage):
         return await message.answer(T.STAGE_NOT_FOUND.format(stage=stage))
     db.set_stage(uid, stage)
     await send_stage(uid, stage)
-    await advance(uid)
+    if quest.is_info(stage):
+        await advance(uid)
     await message.answer(T.SETSTAGE_RESULT.format(uid=uid, stage=stage))
 
 
@@ -764,7 +791,9 @@ async def cmd_reset(message: Message, command: Command) -> None:
     args = (command.args or "").split()
     if not args:
         return await message.answer(T.RESET_USAGE)
-    uid = int(args[0])
+    uid = _resolve(args[0])
+    if not uid:
+        return await message.answer(T.PLAYER_NOT_FOUND)
     db.set_stage(uid, INTRO_STAGE)
     db.reset_hint_usage(uid)
     await message.answer(T.RESET_DONE.format(uid=uid, stage=INTRO_STAGE))
