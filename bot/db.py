@@ -50,6 +50,12 @@ def init_db() -> None:
                 finished_at TEXT,
                 PRIMARY KEY (user_id, node_id)
             );
+            CREATE TABLE IF NOT EXISTS hint_usage (
+                user_id INTEGER NOT NULL,
+                stage   TEXT    NOT NULL,
+                used    INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, stage)
+            );
             """
         )
         # миграции (для уже существующей БД)
@@ -145,6 +151,43 @@ def set_banked(user_id: int, n: int) -> int:
     with _conn() as c:
         c.execute("UPDATE players SET banked=? WHERE user_id=?", (n, user_id))
         return n
+
+
+def consume_hint(user_id: int, stage: str, available: int) -> tuple[str, int, int]:
+    """Атомарно выдаёт следующую подсказку и списывает единицу баланса.
+
+    Возвращает `(status, balance, index)`, где status — `ok`, `exhausted` или
+    `no_balance`, а index при `ok` указывает выданный элемент (с нуля).
+    """
+    available = max(0, int(available))
+    with _conn() as c:
+        c.execute("BEGIN IMMEDIATE")
+        player = c.execute(
+            "SELECT COALESCE(banked, 0) AS banked FROM players WHERE user_id=?",
+            (user_id,),
+        ).fetchone()
+        balance = int(player["banked"]) if player else 0
+        row = c.execute(
+            "SELECT used FROM hint_usage WHERE user_id=? AND stage=?",
+            (user_id, stage),
+        ).fetchone()
+        used = int(row["used"]) if row else 0
+        if used >= available:
+            return "exhausted", balance, used
+        if balance <= 0:
+            return "no_balance", balance, used
+        c.execute(
+            "INSERT INTO hint_usage(user_id, stage, used) VALUES (?, ?, 1) "
+            "ON CONFLICT(user_id, stage) DO UPDATE SET used=hint_usage.used+1",
+            (user_id, stage),
+        )
+        c.execute("UPDATE players SET banked=COALESCE(banked,0)-1 WHERE user_id=?", (user_id,))
+        return "ok", balance - 1, used
+
+
+def reset_hint_usage(user_id: int) -> None:
+    with _conn() as c:
+        c.execute("DELETE FROM hint_usage WHERE user_id=?", (user_id,))
 
 
 def find_by_username(username: str) -> Optional[int]:

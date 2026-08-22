@@ -21,6 +21,7 @@ try:  # `python -m bot.bot`
     from . import config as cfg
     from . import db, quest
     from . import texts as T
+    from .hints import stage_hints
     from .media_spec import delivery_field, parse_media_spec
     from .timed_messages import (
         send_messages as send_timed_messages, send_typewriter, wait_before,
@@ -30,6 +31,7 @@ except ImportError:  # `python bot/bot.py` или запуск из папки b
     import db
     import quest
     import texts as T
+    from hints import stage_hints
     from media_spec import delivery_field, parse_media_spec
     from timed_messages import (
         send_messages as send_timed_messages, send_typewriter, wait_before,
@@ -324,11 +326,31 @@ async def advance(uid: int) -> None:
 
 # ======================== answers & submissions =============================
 
+def _answer_display(message: Message, text: str) -> str:
+    value = (text or "").strip()
+    if value:
+        return value[:3000]
+    if message.photo:
+        return T.ANSWER_KIND_PHOTO
+    if message.document:
+        return T.ANSWER_KIND_DOCUMENT
+    if message.voice:
+        return T.ANSWER_KIND_VOICE
+    if message.video:
+        return T.ANSWER_KIND_VIDEO
+    return T.ANSWER_KIND_EMPTY
+
+
 async def _try_answer(uid: int, message: Message, text: str) -> None:
     player = db.get_player(uid)
     st = quest.get_stage(player["stage"]) if player else None
     if not st or st.get("mode") != "auto":
         return
+    answer = _answer_display(message, text)
+    db.log_event(uid, "answer_attempt", f"{player['stage']}: {answer[:500]}")
+    await notify_host(T.ANSWER_ATTEMPT_HOST.format(
+        name=_name(player), stage=player["stage"], answer=answer,
+    ))
     accepted = [quest.entry_code()] if st.get("accept_entry_code") else st.get("accept", [])
     if quest.validate(accepted, text):
         correct_text = st.get("correct_text", T.CORRECT)
@@ -519,17 +541,22 @@ async def cmd_hint(message: Message) -> None:
     if p["stage"] == "hub":
         return await message.answer(T.NO_HINT_HERE)
     st = quest.get_stage(p["stage"])
-    hint = st.get("hint") if st else None
-    if not hint:
+    hints = stage_hints(st)
+    if not hints:
         return await message.answer(T.NO_HINT_HERE)
-    bal = p["banked"] or 0
-    if bal <= 0:
+    status, bal, hint_index = db.consume_hint(uid, p["stage"], len(hints))
+    if status == "exhausted":
+        return await message.answer(T.NO_MORE_HINTS)
+    if status == "no_balance":
         return await message.answer(T.NO_HINTS_LEFT)
-    db.add_banked(uid, -1)
-    bal -= 1
-    await message.answer(T.HINT_USED.format(hint=hint, remaining=bal))
+    await message.answer(T.HINT_USED.format(
+        hint=hints[hint_index], number=hint_index + 1, total=len(hints), remaining=bal,
+    ))
     if cfg.NOTIFY_HOST:
-        await notify_host(T.HINT_HOST.format(name=_name(p), stage=p["stage"], remaining=bal))
+        await notify_host(T.HINT_HOST.format(
+            name=_name(p), stage=p["stage"], number=hint_index + 1,
+            total=len(hints), remaining=bal,
+        ))
 
 
 @dp.message(Command("help"))
@@ -688,6 +715,26 @@ async def cmd_setstage(message: Message, command: Command) -> None:
     await message.answer(T.SETSTAGE_RESULT.format(uid=uid, stage=stage))
 
 
+@dp.message(HostFilter(), Command("msg", "message"))
+async def cmd_message_player(message: Message, command: Command) -> None:
+    args = (command.args or "").split(maxsplit=1)
+    if len(args) < 2:
+        return await message.answer(T.HOST_MESSAGE_USAGE)
+    target = _resolve(args[0])
+    if not target:
+        return await message.answer(T.PLAYER_NOT_FOUND)
+    text = args[1].strip()
+    if not text:
+        return await message.answer(T.HOST_MESSAGE_USAGE)
+    player = db.get_player(target)
+    try:
+        await bot.send_message(target, T.HOST_MESSAGE_PLAYER.format(text=text))
+    except Exception as error:
+        return await message.answer(T.HOST_MESSAGE_FAIL.format(err=error))
+    db.log_event(target, "host_message", text[:500])
+    await message.answer(T.HOST_MESSAGE_SENT.format(name=_name(player)))
+
+
 @dp.message(HostFilter(), Command("broadcast"))
 async def cmd_broadcast(message: Message, command: Command) -> None:
     text = command.args
@@ -710,6 +757,7 @@ async def cmd_reset(message: Message, command: Command) -> None:
         return await message.answer(T.RESET_USAGE)
     uid = int(args[0])
     db.set_stage(uid, INTRO_STAGE)
+    db.reset_hint_usage(uid)
     await message.answer(T.RESET_DONE.format(uid=uid, stage=INTRO_STAGE))
 
 

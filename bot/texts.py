@@ -15,6 +15,7 @@ ADMIN_HELP = (
     "/addhint <@username или id> <n> — начислить игроку подсказки\n"
     "/sethint <@username или id> <n> — установить точный баланс подсказок\n"
     "/setstage <id> <stage_id> — перевести игрока вручную на любую стадию\n"
+    "/msg <@username или id> <текст> — личное сообщение игроку\n"
     "/broadcast <текст> — сообщение всем\n"
     "/reset <id> — сбросить игрока в начало\n"
     "На сабмитах есть кнопки ✅/❌ (можно и /approve, /reject)."
@@ -32,6 +33,11 @@ UNKNOWN_COMMAND = "Неизвестная команда. /help"
 START_FIRST = "Сначала нажми /start. Ключ активации понадобится позже."
 ALREADY_FINISHED = "Ты уже прошёл квест 🏆"
 WAIT_INFO = "Жди — это информационная стадия. /hint"
+ANSWER_KIND_PHOTO = "[фото без подписи]"
+ANSWER_KIND_DOCUMENT = "[документ без подписи]"
+ANSWER_KIND_VOICE = "[голосовое сообщение]"
+ANSWER_KIND_VIDEO = "[видео без подписи]"
+ANSWER_KIND_EMPTY = "[пустой ответ]"
 
 # ============ ГЕЙТ (ручной допуск ведущего) ============
 IN_GATE = "🔒 Эта стадия пока заблокирована. Жди допуска ведущего."
@@ -75,9 +81,13 @@ NOT_IN_QUEST = "Ты ещё не в квесте."
 PROGRESS_STAGE_HEADER = "📍 Ты на стадии: «{stage}». Осталось подсказок: {bal}.\n── ЗАДАНИЕ ──"
 PROGRESS_FINISHED = "Ты прошёл квест! С остатком подсказок: {bal}"
 HINT_NEED_START = "Сначала нажми /start."
-NO_HINT_HERE = "На эту стадию подсказки нет. Напиши лично ведущему"
+NO_HINT_HERE = "На эту стадию подсказок нет."
+NO_MORE_HINTS = "Ты уже использовал все подсказки этой стадии."
 NO_HINTS_LEFT = "У тебя нет подсказок."
-HINT_USED = "💡 {hint}\n\n(Потрачена 1 подсказка. Осталось: {remaining})"
+HINT_USED = (
+    "💡 Подсказка {number}/{total}:\n{hint}\n\n"
+    "(Потрачена 1 подсказка. Осталось: {remaining})"
+)
 
 # ============ ДИАГНОСТИКА ============
 PONG = "🏓 pong — бот жив и отвечает"
@@ -96,7 +106,11 @@ REJECTED_TO_PLAYER = "❌ Не засчитано. Попробуй иначе �
 ADVANCE_HOST = "➡️ {name}: «{cur}» → «{nxt}»"
 FINISH_HOST = "🏆 {name} ЗАВЕРШИЛ квест! Осталось подсказок: {bal}"
 FINISH_PLAYER = "Квест пройден! У тебя осталось {bal} подсказок."
-HINT_HOST = "💡 {name} потратил подсказку на «{stage}» (осталось {remaining})"
+HINT_HOST = (
+    "💡 {name} взял подсказку {number}/{total} на «{stage}» "
+    "(осталось: {remaining})"
+)
+ANSWER_ATTEMPT_HOST = "💬 Ответ от {name}\nСтадия: «{stage}»\n{answer}"
 STAGE_MISSING = "(стадия «{stage}» не найдена — скажи ведущему)"
 
 # ============ ВЕДУЩИЙ: СПИСКИ ============
@@ -121,6 +135,10 @@ BANK_SET_PLAYER = "📊 Твой баланс подсказок: {bal}."
 SETSTAGE_USAGE = "/setstage <id> <stage_id>"
 STAGE_NOT_FOUND = "Стадии «{stage}» нет в квесте."
 SETSTAGE_RESULT = "✅ {uid} переведён на «{stage}»."
+HOST_MESSAGE_USAGE = "/msg <@username или id> <текст>"
+HOST_MESSAGE_PLAYER = "📨 Сообщение от ведущего:\n\n{text}"
+HOST_MESSAGE_SENT = "✅ Сообщение отправлено: {name}."
+HOST_MESSAGE_FAIL = "❌ Не удалось отправить сообщение: {err}"
 BROADCAST_USAGE = "/broadcast <текст>"
 BROADCAST_DONE = "Разослано {n} игрокам."
 RESET_USAGE = "/reset <id>"
