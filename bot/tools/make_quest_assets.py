@@ -285,26 +285,11 @@ def _write_wav(path: Path, audio: np.ndarray, sr: int = 22050):
         wf.writeframes(pcm.tobytes())
 
 
-def make_morse_wav(
-    text: str,
-    out: Path,
-    reverse: bool = False,
-    sr: int = 22050,
-    unit_seconds: float = 0.08,
-    preserve_spaces: bool = False,
-):
-    """Пишет русский Морзе; при preserve_spaces слова разделены длинной паузой."""
-    unit = int(sr * unit_seconds)
+def make_morse_wav(text: str, out: Path, reverse: bool = False, sr: int = 22050):
+    unit = int(sr * 0.08)
     freq = 680.0
     chunks = []
-    normalized = text.upper().replace("Ё", "Е")
-    symbols = normalized if preserve_spaces else only_ru(normalized)
-    for ch in symbols:
-        if ch == " " and preserve_spaces:
-            chunks.append(np.zeros(6 * unit, dtype=np.float32))
-            continue
-        if ch not in MORSE_RU:
-            continue
+    for ch in only_ru(text):
         code = MORSE_RU[ch]
         for sym in code:
             n = unit if sym == "." else 3 * unit
@@ -322,59 +307,93 @@ def make_morse_wav(
     print(f"  N2  {out.name}  morse «{text}» reverse={reverse}")
 
 
-def make_word_spectrogram_wav(text: str, out: Path, duration: float = 4.0, sr: int = 22050):
-    text = text.upper().replace("Ё", "Е")
-    cols = len(text) * 6 - 1
-    rows = 7
-    raw = np.zeros((rows, cols), dtype=np.float32)
-    x = 0
-    for ch in text:
-        glyph = np.array([[int(c) for c in line] for line in PIXEL_FONT_5x7[ch]], dtype=np.float32)
-        raw[:, x:x + 5] = glyph
-        x += 6
-    n_freq, n_tpp = 28, 6
-    n_time = cols * n_tpp + 8
-    pad = max(0, (n_freq - rows * 2) // 2)
+def make_fibonacci_rhythm_wav(out: Path, sr: int = 22050):
+    """Шесть групп импульсов: 1, 1, 2, 3, 5, 8."""
+    counts = (1, 1, 2, 3, 5, 8)
+    pulse_n = int(sr * 0.08)
+    short_gap = np.zeros(int(sr * 0.10), dtype=np.float32)
+    group_gap = np.zeros(int(sr * 0.65), dtype=np.float32)
+    t = np.arange(pulse_n) / sr
+    pulse = (np.sin(2 * np.pi * 920 * t) * np.hanning(pulse_n)).astype(np.float32)
+    chunks = [np.zeros(int(sr * 0.25), dtype=np.float32)]
+    for count in counts:
+        for index in range(count):
+            chunks.append(pulse)
+            if index + 1 < count:
+                chunks.append(short_gap)
+        chunks.append(group_gap)
+    _write_wav(out, np.concatenate(chunks), sr)
+    print(f"  N2  {out.name}  rhythm groups={counts}")
+
+
+def make_multiline_spectrogram_wav(
+    lines: tuple[str, ...],
+    out: Path,
+    duration: float = 12.0,
+    sr: int = 22050,
+):
+    """Рисует несколько строк 5×7-шрифтом в спектрограмме WAV."""
+    lines = tuple(line.upper().replace("Ё", "Е") for line in lines)
+    cols = max(len(line) * 6 - 1 for line in lines)
+    rows = len(lines) * 9 - 2
+    canvas = np.zeros((rows, cols), dtype=np.float32)
+    for line_index, line in enumerate(lines):
+        x = 0
+        y = line_index * 9
+        for ch in line:
+            glyph = np.array(
+                [[int(bit) for bit in glyph_row] for glyph_row in PIXEL_FONT_5x7[ch]],
+                dtype=np.float32,
+            )
+            canvas[y:y + 7, x:x + 5] = glyph
+            x += 6
+
+    repeats = 4
+    n_time = (cols + 2) * repeats
+    n_freq = max(48, rows * 2 + 8)
     target = np.zeros((n_freq, n_time), dtype=np.float32)
-    for ti in range(n_time):
-        src = min(cols - 1, ti // n_tpp)
-        for r in range(rows):
-            if raw[r, src]:
-                target[pad + r * 2, ti] = 1
-                if pad + r * 2 + 1 < n_freq:
-                    target[pad + r * 2 + 1, ti] = 1
-    spc = max(int(sr * duration / n_time), 32)
-    audio = np.zeros(spc * n_time, dtype=np.float32)
-    tloc = np.arange(spc) / sr
-    freqs = 700 + np.arange(n_freq) * (5800 / max(n_freq - 1, 1))
-    waves = np.sin(2 * np.pi * freqs[:, None] * tloc[None, :]).astype(np.float32)
-    for ci in range(n_time):
-        active = target[:, ci] > 0.5
-        if not active.any():
+    pad = (n_freq - rows * 2) // 2
+    for time_index in range(n_time):
+        source_x = time_index // repeats - 1
+        if not 0 <= source_x < cols:
             continue
-        col = waves[active].sum(axis=0)
-        col = col / (np.max(np.abs(col)) or 1) * 0.85
-        audio[ci * spc:(ci + 1) * spc] = col
+        for y in range(rows):
+            if not canvas[y, source_x]:
+                continue
+            # Верхняя строка текста должна оказаться в верхней части спектрограммы.
+            frequency_index = pad + (rows - 1 - y) * 2
+            target[frequency_index:frequency_index + 2, time_index] = 1
+
+    samples_per_column = max(int(sr * duration / n_time), 32)
+    total_samples = samples_per_column * n_time
+    timeline = np.arange(total_samples) / sr
+    frequencies = 450 + np.arange(n_freq) * (8550 / max(n_freq - 1, 1))
+    audio = np.zeros(total_samples, dtype=np.float32)
+    for frequency_index in np.flatnonzero(target.any(axis=1)):
+        envelope = np.repeat(target[frequency_index], samples_per_column)
+        carrier = np.sin(2 * np.pi * frequencies[frequency_index] * timeline)
+        audio += (carrier * envelope).astype(np.float32)
     _write_wav(out, audio, sr)
-    print(f"  N2  {out.name}  spectrogram «{text}»")
+    print(f"  N2  {out.name}  spectrogram lines={lines}")
 
 
 N2_KEY = "КЛЮЧ"
 N2_PLAIN = "СЛАБЫЙ ИМПУЛЬС ГАСНЕТ НО НОЧНОЙ ЭФИР ЕЩЕ АККУРАТНО ХРАНИТ ЕГО ПОД СЛОЕМ ЛЬДА"
 N2_CIPHER = vigenere(N2_PLAIN, N2_KEY)
-N2_MORSE_MESSAGE = f"ВИЖЕНЕР {N2_CIPHER}"
+N2_SPECTROGRAM_LINES = (
+    "ВИЖЕНЕР",
+    "ЫЦЮШЕФ ЖГЩЮЙУЫ ОЮИЧРР ДШ",
+    "ШМОЧЩЗ ФЮУО ЬГР ЮБФЮОЧЬШМ",
+    "МЪЛЛЯЬ РБЕ ЩЩВ ИХЩГГ ХЗВЧ",
+)
+assert " ".join(N2_SPECTROGRAM_LINES[1:]) == N2_CIPHER
 
 
 def make_n2():
-    """КЛЮЧ → ФИБО → Морзе(ВИЖЕНЕР + шифртекст) → СИГНАЛ."""
+    """Реверс-Морзе КЛЮЧ → ритм ФИБО → спектрограмма-шифртекст → СИГНАЛ."""
     make_morse_wav(N2_KEY, OUT / "n2_reversed.wav", reverse=True)
-    make_word_spectrogram_wav("ФИБО", OUT / "n2_spec.wav", duration=3.6)
-    make_morse_wav(
-        N2_MORSE_MESSAGE,
-        OUT / "n2_cipher.wav",
-        unit_seconds=0.045,
-        preserve_spaces=True,
-    )
+    make_fibonacci_rhythm_wav(OUT / "n2_fibo.wav")
+    make_multiline_spectrogram_wav(N2_SPECTROGRAM_LINES, OUT / "n2_cipher.wav")
     print(f"  N2  vigenere key={N2_KEY}: «{N2_PLAIN}» → «{N2_CIPHER}»")
 
 
@@ -665,7 +684,7 @@ def write_readme():
 
 Все файлы принадлежат узлам N1–N6 (см. `bot/docs/QUEST_WALKTHROUGH.md`).
 `n1_card.jpg` шлётся как document, иначе Telegram сожмёт EXIF и хвост JPEG.
-N2 использует связанную цепочку `n2_reversed.wav` → `n2_spec.wav` → `n2_cipher.wav`.
+N2 использует связанную цепочку `n2_reversed.wav` → `n2_fibo.wav` → `n2_cipher.wav`.
 """,
         encoding="utf-8",
     )

@@ -17,6 +17,19 @@ class N2AudioChainTests(unittest.TestCase):
     PLAIN = "СЛАБЫЙ ИМПУЛЬС ГАСНЕТ НО НОЧНОЙ ЭФИР ЕЩЕ АККУРАТНО ХРАНИТ ЕГО ПОД СЛОЕМ ЛЬДА"
     CIPHER = "ЫЦЮШЕФ ЖГЩЮЙУЫ ОЮИЧРР ДШ ШМОЧЩЗ ФЮУО ЬГР ЮБФЮОЧЬШМ МЪЛЛЯЬ РБЕ ЩЩВ ИХЩГГ ХЗВЧ"
 
+    @staticmethod
+    def _read_wav(name):
+        path = REPO_ROOT / "bot" / "quest" / "images" / name
+        with wave.open(str(path), "rb") as wav:
+            channels = wav.getnchannels()
+            width = wav.getsampwidth()
+            rate = wav.getframerate()
+            frames = wav.getnframes()
+            samples = array("h", wav.readframes(frames))
+        if sys.byteorder != "little":
+            samples.byteswap()
+        return channels, width, rate, frames, samples
+
     def test_vigenere_and_fibonacci_layers_produce_final_answer(self):
         self.assertEqual(vigenere(self.PLAIN, self.KEY), self.CIPHER)
         self.assertEqual(vigenere(self.CIPHER, self.KEY, decrypt=True), self.PLAIN)
@@ -26,31 +39,23 @@ class N2AudioChainTests(unittest.TestCase):
 
     def test_quest_uses_single_connected_audio_chain(self):
         stages = (REPO_ROOT / "bot" / "quest" / "stages.yaml").read_text(encoding="utf-8")
-        for filename in ("n2_reversed.wav", "n2_spec.wav", "n2_cipher.wav"):
+        for filename in ("n2_reversed.wav", "n2_fibo.wav", "n2_cipher.wav"):
             self.assertIn(filename, stages)
             self.assertTrue((REPO_ROOT / "bot" / "quest" / "images" / filename).is_file())
         self.assertIn('      - "ЛЬДА"', stages)
         self.assertIn('      - "СИГНАЛ"', stages)
-        self.assertNotIn("n2_verse.png", stages)
+        self.assertNotIn("n2_spec.wav", stages)
 
-    def test_cipher_audio_round_trips_through_morse(self):
-        path = REPO_ROOT / "bot" / "quest" / "images" / "n2_cipher.wav"
-        with wave.open(str(path), "rb") as wav:
-            self.assertEqual(wav.getnchannels(), 1)
-            self.assertEqual(wav.getsampwidth(), 2)
-            sample_rate = wav.getframerate()
-            self.assertEqual(sample_rate, 22050)
-            self.assertGreater(wav.getnframes() / sample_rate, 30.0)
-            samples = array("h", wav.readframes(wav.getnframes()))
-        if sys.byteorder != "little":
-            samples.byteswap()
+    def test_rhythm_audio_encodes_fibonacci_counts(self):
+        channels, width, rate, _frames, samples = self._read_wav("n2_fibo.wav")
+        self.assertEqual((channels, width, rate), (1, 2, 22050))
 
-        unit = int(sample_rate * 0.045)
+        frame_size = rate // 100  # 10 ms
+        threshold_squared = 2500 ** 2
         active = []
-        threshold_squared = 4000 ** 2
-        for start in range(0, len(samples) - unit + 1, unit):
-            block = samples[start:start + unit]
-            active.append(sum(value * value for value in block) / unit > threshold_squared)
+        for start in range(0, len(samples) - frame_size + 1, frame_size):
+            block = samples[start:start + frame_size]
+            active.append(sum(value * value for value in block) / frame_size > threshold_squared)
 
         runs = []
         current = active[0]
@@ -63,34 +68,37 @@ class N2AudioChainTests(unittest.TestCase):
                 current, length = value, 1
         runs.append((current, length))
 
+        groups = []
+        pulse_count = 0
+        for is_tone, run_length in runs:
+            if is_tone:
+                pulse_count += 1
+            elif run_length >= 30 and pulse_count:
+                groups.append(pulse_count)
+                pulse_count = 0
+        if pulse_count:
+            groups.append(pulse_count)
+        self.assertEqual(groups, [1, 1, 2, 3, 5, 8])
+
+    def test_cipher_is_short_multiline_spectrogram(self):
+        channels, width, rate, frames, _samples = self._read_wav("n2_cipher.wav")
+        self.assertEqual((channels, width, rate), (1, 2, 22050))
+        self.assertGreater(frames / rate, 8.0)
+        self.assertLess(frames / rate, 15.0)
+
         source = (REPO_ROOT / "bot" / "tools" / "make_quest_assets.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
-        morse = next(
+        lines = next(
             ast.literal_eval(node.value)
             for node in tree.body
             if isinstance(node, ast.Assign)
-            and any(isinstance(target, ast.Name) and target.id == "MORSE_RU" for target in node.targets)
+            and any(
+                isinstance(target, ast.Name) and target.id == "N2_SPECTROGRAM_LINES"
+                for target in node.targets
+            )
         )
-        decode = {code: letter for letter, code in morse.items()}
-        words, letters, code = [], [], ""
-        for is_tone, run_length in runs:
-            if is_tone:
-                code += "." if run_length <= 1 else "-"
-            elif run_length >= 8:
-                if code:
-                    letters.append(decode[code])
-                    code = ""
-                words.append("".join(letters))
-                letters = []
-            elif run_length >= 3 and code:
-                letters.append(decode[code])
-                code = ""
-        if code:
-            letters.append(decode[code])
-        if letters:
-            words.append("".join(letters))
-
-        self.assertEqual(" ".join(words), f"ВИЖЕНЕР {self.CIPHER}")
+        self.assertEqual(lines[0], "ВИЖЕНЕР")
+        self.assertEqual(" ".join(lines[1:]), self.CIPHER)
 
 
 if __name__ == "__main__":
