@@ -31,6 +31,8 @@ class NonSpoilerMetadataTests(unittest.TestCase):
             "биты", "квадрат", "html", "замок", "зеркало", "рельсы", "a1z26",
         ):
             self.assertNotIn(spoiler, node_lines)
+        for category in ("бумажные шифры", "видео", "числовая логика", "цепочка шифров"):
+            self.assertIn(category, node_lines)
 
     def test_player_facing_assets_have_neutral_names(self):
         images = REPO_ROOT / "bot" / "quest" / "images"
