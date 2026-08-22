@@ -9,12 +9,14 @@ if str(REPO_ROOT) not in sys.path:
 
 class NonSpoilerMetadataTests(unittest.TestCase):
     ARTIFACTS = (
+        "n2_1.wav", "n2_2.wav", "n2_3.wav",
         "artifact_3a.png", "artifact_3b.png", "artifact_3c.png", "artifact_3d.png",
         "artifact_4a.mp4", "artifact_4b.png", "artifact_4c.png",
         "artifact_5a.png", "artifact_5b.html", "artifact_5c.png",
         "artifact_6a.png",
     )
     OLD_NAMES = (
+        "n2_reversed.wav", "n2_fibo.wav", "n2_cipher.wav",
         "n3_pigpen.png", "n3_rail.png", "n3_vig.png", "n3_book.png",
         "n4_walk.mp4", "n4_signs.png", "n4_shards.png",
         "n5_table.png", "n5_ledger.html", "n5_lock.png", "n6_locks.png",

@@ -49,9 +49,7 @@ class N2AudioChainTests(unittest.TestCase):
 
     def test_quest_uses_single_connected_audio_chain(self):
         stages = (REPO_ROOT / "bot" / "quest" / "stages.yaml").read_text(encoding="utf-8")
-        # Первый N2-файл пользователь переименовывает вручную; здесь проверяем
-        # только неизменные слои ритма и спектрограммы.
-        for filename in ("n2_fibo.wav", "n2_cipher.wav"):
+        for filename in ("n2_1.wav", "n2_2.wav", "n2_3.wav"):
             self.assertIn(filename, stages)
             self.assertTrue((REPO_ROOT / "bot" / "quest" / "images" / filename).is_file())
         self.assertIn('      - "ЛЬДА"', stages)
@@ -59,7 +57,7 @@ class N2AudioChainTests(unittest.TestCase):
         self.assertNotIn("n2_spec.wav", stages)
 
     def test_rhythm_audio_encodes_fibonacci_counts(self):
-        channels, width, rate, _frames, samples = self._read_wav("n2_fibo.wav")
+        channels, width, rate, _frames, samples = self._read_wav("n2_2.wav")
         self.assertEqual((channels, width, rate), (1, 2, 22050))
 
         frame_size = rate // 100  # 10 ms
@@ -93,7 +91,7 @@ class N2AudioChainTests(unittest.TestCase):
         self.assertEqual(groups, [1, 1, 2, 3, 5, 8])
 
     def test_cipher_is_short_multiline_spectrogram(self):
-        channels, width, rate, frames, _samples = self._read_wav("n2_cipher.wav")
+        channels, width, rate, frames, _samples = self._read_wav("n2_3.wav")
         self.assertEqual((channels, width, rate), (1, 2, 22050))
         self.assertGreater(frames / rate, 8.0)
         self.assertLess(frames / rate, 15.0)

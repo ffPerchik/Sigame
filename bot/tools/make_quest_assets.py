@@ -457,9 +457,9 @@ assert " ".join(N2_SPECTROGRAM_LINES[1:]) == N2_CIPHER
 
 def make_n2():
     """Реверс-Морзе КЛЮЧ → ритм ФИБО → спектрограмма-шифртекст → СИГНАЛ."""
-    make_morse_wav(N2_KEY, OUT / "n2_reversed.wav", reverse=True)
-    make_fibonacci_rhythm_wav(OUT / "n2_fibo.wav")
-    make_multiline_spectrogram_wav(N2_SPECTROGRAM_LINES, OUT / "n2_cipher.wav")
+    make_morse_wav(N2_KEY, OUT / "n2_1.wav", reverse=True)
+    make_fibonacci_rhythm_wav(OUT / "n2_2.wav")
+    make_multiline_spectrogram_wav(N2_SPECTROGRAM_LINES, OUT / "n2_3.wav")
     print(f"  N2  vigenere-33(Ё) key={N2_KEY}: «{N2_PLAIN}» → «{N2_CIPHER}»")
 
 
@@ -750,7 +750,7 @@ def write_readme():
 
 Все файлы принадлежат узлам N1–N6 (см. `bot/docs/QUEST_WALKTHROUGH.md`).
 `n1_card.jpg` шлётся как document, иначе Telegram сожмёт EXIF и хвост JPEG.
-N2 использует связанную цепочку `n2_reversed.wav` → `n2_fibo.wav` → `n2_cipher.wav`;
+N2 использует связанную цепочку `n2_1.wav` → `n2_2.wav` → `n2_3.wav`;
 в последнем файле скрытая спектрограмма наложена на слышимый вальс.
 Файлы N3–N6 называются нейтрально (`artifact_*`), чтобы имя не выдавало метод решения.
 """,
