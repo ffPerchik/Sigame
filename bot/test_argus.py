@@ -179,15 +179,22 @@ class TimedMessagesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(z_1.count("speaker: zhenya"), 2)
         self.assertEqual(z_1.count("delay: 1.5"), 2)
 
-        expected_stage_delays = {"z_2": "3", "z_3": "1.5", "z_4": "1.5"}
+        expected_stage_delays = {"z_2": "3", "z_3": "4", "z_4": "1.5"}
         for stage_id, delay in expected_stage_delays.items():
             block = stage_block(stage_id)
             self.assertIn(f"\n    speaker: zhenya\n    delay: {delay}", block)
 
         self.assertIn(
-            "{speaker: zhenya, delay: 1.5, text: \"Женя: нет нет нет подож—\"}",
+            "{speaker: zhenya, delay: 2.5, text: \"нет нет нет подож——\"}",
             stages,
         )
+
+    def test_quest_unlock_waits_for_host_accept(self):
+        stages = (REPO_ROOT / "bot" / "quest" / "stages.yaml").read_text(encoding="utf-8")
+        block = stages.split("  quest_unlocked:\n", 1)[1].split("\n\n  ", 1)[0]
+        self.assertIn("    mode: gate", block)
+        self.assertIn("Мы свяжемся с тобой, когда придёт время", block)
+        self.assertIn("    next: hub", block)
 
     async def test_stage_delay_waits_before_main_message(self):
         sleeps = []

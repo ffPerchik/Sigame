@@ -169,7 +169,7 @@ stages:
     next: quest_unlocked
 
   quest_unlocked:
-    mode: info
+    mode: gate
     messages:
       - {speaker: argus, delay: 0.5, text: "ACTIVATION KEY ACCEPTED"}
       - {speaker: argus, delay: 0.5, text: "ДОСТУП К ШЕСТИ УЗЛАМ РАЗРЕШЁН"}

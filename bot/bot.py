@@ -143,6 +143,27 @@ def _name(p) -> str:
     return f"{p['name']} (@{p['username'] or '—'})"
 
 
+async def _request_gate_approval(uid: int, stage_id: str) -> None:
+    """Отправляет ведущему кнопку, открывающую следующий этап игроку."""
+    player = db.get_player(uid)
+    name = _name(player) if player else str(uid)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text=T.GATE_ACCEPT_BUTTON,
+            callback_data=f"gate_accept:{uid}:{stage_id}",
+        ),
+    ]])
+    try:
+        # Для ручного гейта кнопка нужна даже при HOST_CONSOLE=1.
+        await bot.send_message(
+            cfg.HOST_ID,
+            T.GATE_APPROVAL_HOST.format(name=name, stage=stage_id),
+            reply_markup=keyboard,
+        )
+    except Exception as error:
+        _host_print(T.GATE_APPROVAL_FAIL.format(name=name, err=error))
+
+
 # ======================== send_stage ========================================
 
 async def send_stage(uid: int, stage_id: str) -> None:
@@ -168,8 +189,11 @@ async def send_stage(uid: int, stage_id: str) -> None:
     media_dir = BASE / "quest" / "images"
     has_media = any(st.get(field) for field in ("image", "audio", "video", "document"))
     if not (text or has_media):
+        if st.get("mode") == "gate":
+            await _request_gate_approval(uid, stage_id)
         return
 
+    media_delivered = False
     async with _speaker_activity(uid, st.get("speaker")):
         # `delay` относится только к следующему обычному сообщению/медиа стадии
         # и всегда отрабатывает ДО него, никогда после.
@@ -197,14 +221,18 @@ async def send_stage(uid: int, stage_id: str) -> None:
                     await _send_typewriter_media(sender, uid, path, text)
                 else:
                     await sender(uid, FSInputFile(path), caption=text)
-                return
+                media_delivered = True
+                break
             except Exception as e:
                 print(T.MEDIA_FAIL.format(kind=kind_label, path=path, err=e))
-        if text:
+        if text and not media_delivered:
             if st.get("speaker") == "zhenya":
                 await _send_typewriter_text(uid, text)
             else:
                 await bot.send_message(uid, text)
+
+    if st.get("mode") == "gate":
+        await _request_gate_approval(uid, stage_id)
 
 
 # ======================== HUB ===============================================
@@ -405,6 +433,31 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
     username = message.from_user.username or "—"
     await notify_host(T.NEW_PLAYER_INTRO.format(name=name, username=username))
     await send_stage(uid, INTRO_STAGE)
+
+
+# ======================== host gate =========================================
+
+@dp.callback_query(F.data.startswith("gate_accept:"))
+async def cb_gate_accept(cq: CallbackQuery) -> None:
+    if cq.from_user.id != cfg.HOST_ID:
+        await cq.answer(T.ONLY_HOST, show_alert=True)
+        return
+
+    _, raw_uid, stage_id = cq.data.split(":", 2)
+    uid = int(raw_uid)
+    player = db.get_player(uid)
+    stage = quest.get_stage(stage_id)
+    if not player or player["stage"] != stage_id or not stage or stage.get("mode") != "gate":
+        await cq.answer(T.GATE_ALREADY_RESOLVED, show_alert=True)
+        return
+
+    db.log_event(uid, "gate_approved", stage_id)
+    await cq.answer(T.GATE_ACCEPTED_ALERT)
+    try:
+        await cq.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await advance(uid)
 
 
 # ======================== node pick (hub buttons) ===========================
