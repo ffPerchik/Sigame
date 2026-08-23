@@ -745,7 +745,25 @@ def make_n3():
     page3 = parchment_page(PARCHMENT_SOURCE_3)
     draw = ImageDraw.Draw(page3)
     centered_text(draw, "Лист III", 85, script_font(82), ink)
-    centered_text(draw, "на полях: «первое слово начинает алфавит»", 205, script_font(40), faded_ink)
+
+    # Настоящая пометка на полях: вся строка повёрнута на 90° вдоль левого края.
+    margin_text = "на полях: «первое слово начинает алфавит»"
+    margin_font = script_font(40)
+    margin_box = draw.textbbox((0, 0), margin_text, font=margin_font)
+    margin_layer = Image.new(
+        "RGBA",
+        (margin_box[2] - margin_box[0] + 24, margin_box[3] - margin_box[1] + 24),
+        (0, 0, 0, 0),
+    )
+    ImageDraw.Draw(margin_layer).text(
+        (12 - margin_box[0], 12 - margin_box[1]),
+        margin_text,
+        fill=(*faded_ink, 255),
+        font=margin_font,
+    )
+    margin_layer = margin_layer.rotate(90, resample=Image.Resampling.BICUBIC, expand=True)
+    page3.paste(margin_layer, (82, 340), margin_layer)
+    draw = ImageDraw.Draw(page3)
 
     grid_x, grid_y, cell = 245, 355, 85
     grid_size = cell * 6
@@ -764,9 +782,15 @@ def make_n3():
             str(index + 1), fill=faded_ink, font=label_font, anchor="mm",
         )
 
-    centered_text(draw, "33 буквы, включая ё", 930, script_font(40), faded_ink)
-    centered_text(draw, "  ".join(polybius_pairs), 1050, script_font(82), accent)
-    centered_text(draw, "сначала строка, потом столбец", 1195, script_font(44), faded_ink)
+    # Две заполненные клетки помогают проверить построение ключевого алфавита.
+    given_font = script_font(52)
+    for (row, column), letter in {(2, 5): "Ё", (6, 3): "Я"}.items():
+        draw.text(
+            (grid_x + (column - 0.5) * cell, grid_y + (row - 0.5) * cell),
+            letter, fill=ink, font=given_font, anchor="mm",
+        )
+
+    centered_text(draw, "  ".join(polybius_pairs), 1035, script_font(82), accent)
     page3.save(OUT / "artifact_3c.png", optimize=True)
 
     # Лист IV: книжные координаты остаются частью самого рукописного листа.

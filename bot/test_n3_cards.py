@@ -70,6 +70,10 @@ class N3CardStyleTests(unittest.TestCase):
         self.assertIn("assert rail_counts == [7, 14, 7]", n3)
         self.assertIn('polybius_pairs == ["43", "14", "11", "41", "45", "16"]', n3)
         self.assertIn("первое слово начинает алфавит", n3)
+        self.assertIn("margin_layer.rotate(90", n3)
+        self.assertIn('{(2, 5): "Ё", (6, 3): "Я"}', n3)
+        self.assertNotIn("33 буквы, включая ё", n3)
+        self.assertNotIn("сначала строка, потом столбец", n3)
         self.assertNotIn("vigenere(", n3)
         self.assertNotIn("ВИЖНЕР", n3)
 
