@@ -100,12 +100,13 @@ def rail_fence_dec(cipher: str, rails: int = 3) -> str:
     return "".join(out)
 
 
-# Масонский / pigpen: 4 группы по 9, используем 32 символа (последние 4 группы урезаны)
+# Масонский / pigpen: две решётки 3×3 (прямая и ромбическая),
+# каждая без точки и с точкой; из 36 позиций используются первые 32.
 PIGPEN_ORDER = RU  # индекс → глиф
 
 
-def pigpen_cell(idx: int) -> tuple[str, bool]:
-    """Тип глифа и точка."""
+def pigpen_cell(idx: int) -> tuple[str, bool, int]:
+    """Тип решётки, наличие точки и позиция клетки 0…8."""
     group, pos = divmod(idx, 9)
     dotted = group % 2 == 1
     kind = "box" if group in (0, 1) else "x"

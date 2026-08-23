@@ -183,36 +183,67 @@ def draw_pigpen(
     s = scale
     # 3×3 позиции: 0 1 2 / 3 4 5 / 6 7 8
     r, c = divmod(pos, 3)
-    # стенки «коробки»: рисуем отсутствующие внешние? классика — рисуем линии клетки
-    # упрощённо: квадрат с пропущенной стороной к центру группы
     cx, cy = x + s, y + s
-    if kind == "box":
-        # внешние линии в зависимости от позиции
-        # top
-        if r != 0:
-            draw.line((x, y, x + 2 * s, y), fill=color, width=width)
-        # bottom
-        if r != 2:
-            draw.line((x, y + 2 * s, x + 2 * s, y + 2 * s), fill=color, width=width)
-        # left
-        if c != 0:
-            draw.line((x, y, x, y + 2 * s), fill=color, width=width)
-        # right
-        if c != 2:
-            draw.line((x + 2 * s, y, x + 2 * s, y + 2 * s), fill=color, width=width)
-    else:
-        # X-семейство: два луча, ориентация по pos 0..3 обычно, у нас 0..8
-        arms = [
-            [(cx, cy, cx, y), (cx, cy, x + 2 * s, cy)],  # up-right
-            [(cx, cy, x + 2 * s, cy), (cx, cy, cx, y + 2 * s)],
-            [(cx, cy, cx, y + 2 * s), (cx, cy, x, cy)],
-            [(cx, cy, x, cy), (cx, cy, cx, y)],
+    # Стенки соответствующей клетки обычной решётки 3×3.
+    segments = []
+    if r != 0:
+        segments.append((x, y, x + 2 * s, y))
+    if r != 2:
+        segments.append((x, y + 2 * s, x + 2 * s, y + 2 * s))
+    if c != 0:
+        segments.append((x, y, x, y + 2 * s))
+    if c != 2:
+        segments.append((x + 2 * s, y, x + 2 * s, y + 2 * s))
+
+    if kind == "x":
+        # Вторая решётка — та же таблица 3×3, повёрнутая ромбом на 45°.
+        # Так все девять позиций остаются различимыми, в отличие от четырёх
+        # повторяющихся углов обычного X.
+        root_half = 2 ** -0.5
+
+        def rotate_point(px, py):
+            dx, dy = px - cx, py - cy
+            return (
+                cx + (dx - dy) * root_half,
+                cy + (dx + dy) * root_half,
+            )
+
+        segments = [
+            (*rotate_point(x1, y1), *rotate_point(x2, y2))
+            for x1, y1, x2, y2 in segments
         ]
-        pair = arms[pos % 4]
-        for seg in pair:
-            draw.line(seg, fill=color, width=width)
+
+    for segment in segments:
+        draw.line(segment, fill=color, width=width)
     if dotted:
         draw.ellipse((cx - 3, cy - 3, cx + 3, cy + 3), fill=color)
+
+
+def draw_pigpen_diamond_key(
+    draw: ImageDraw.ImageDraw,
+    center: tuple[int, int],
+    cell=34,
+    color=(58, 37, 23),
+    width=5,
+):
+    """Ромбическая решётка 3×3 — ключ ко второй половине алфавита."""
+    cx, cy = center
+    half = 1.5 * cell
+    root_half = 2 ** -0.5
+
+    def rotate_point(px, py):
+        dx, dy = px - cx, py - cy
+        return (
+            cx + (dx - dy) * root_half,
+            cy + (dx + dy) * root_half,
+        )
+
+    for index in range(4):
+        offset = -half + index * cell
+        vertical = (*rotate_point(cx + offset, cy - half), *rotate_point(cx + offset, cy + half))
+        horizontal = (*rotate_point(cx - half, cy + offset), *rotate_point(cx + half, cy + offset))
+        draw.line(vertical, fill=color, width=width)
+        draw.line(horizontal, fill=color, width=width)
 
 
 def _n1_still() -> Image.Image:
@@ -559,19 +590,29 @@ def make_n3():
         draw_pigpen(draw, (cipher_x + index * 49, 416), letter, scale=11, color=ink, width=5)
 
     draw.line((120, 565, 900, 565), fill=faded_ink, width=2)
-    centered_text(draw, "А теперь — загадка", 650, script_font(52), ink)
 
-    # Само послание идёт диагонально слева направо; знаки меньше, но черта толще.
-    start_x, start_y = 145, 785
+    # Сначала рисуем послание одной горизонтальной строкой, затем целиком
+    # поворачиваем её на 45°: вместе со строкой поворачивается каждый знак.
+    message_strip = Image.new("RGBA", (610, 105), (0, 0, 0, 0))
+    strip_draw = ImageDraw.Draw(message_strip)
     for index, letter in enumerate(word1):
         draw_pigpen(
-            draw,
-            (start_x + index * 105, start_y + index * 68),
+            strip_draw,
+            (25 + index * 82, 27),
             letter,
-            scale=25,
-            color=ink,
+            scale=23,
+            color=(*ink, 255),
             width=7,
         )
+    rotated_message = message_strip.rotate(
+        -45,
+        resample=Image.Resampling.BICUBIC,
+        expand=True,
+    )
+    page1.paste(rotated_message, (315, 655), rotated_message)
+
+    # Ромбическая таблица 3×3 дополняет показанную сверху прямую решётку.
+    draw_pigpen_diamond_key(draw, (175, 1305), cell=42, color=ink, width=6)
     page1.save(OUT / "artifact_3a.png", optimize=True)
 
     # Лист II: никаких названий метода — только след из трёх линий.

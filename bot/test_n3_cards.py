@@ -24,13 +24,24 @@ class N3CardStyleTests(unittest.TestCase):
         self.assertIn('"Решил создать новый язык,"', n3)
         self.assertIn('"«сикс севен»"', n3)
         self.assertIn("scale=11, color=ink, width=5", n3)
-        self.assertIn("start_y + index * 68", n3)
-        self.assertIn("scale=25", n3)
+        self.assertIn('Image.new("RGBA", (610, 105)', n3)
+        self.assertIn("message_strip.rotate(", n3)
+        self.assertIn("-45,", n3)
+        self.assertIn("scale=23", n3)
         self.assertIn("width=7", n3)
+        self.assertIn("draw_pigpen_diamond_key", n3)
+        self.assertNotIn("А теперь — загадка", n3)
         self.assertIn("parchment_page()", n3)
         self.assertIn("script_font(", n3)
         self.assertNotIn("hack_glitch", n3)
         self.assertNotIn("образец АБВ", n3)
+
+    def test_diamond_family_keeps_all_nine_positions_distinct(self):
+        source = (REPO_ROOT / "bot" / "tools" / "make_quest_assets.py").read_text(encoding="utf-8")
+        pigpen = source.split("def draw_pigpen(", 1)[1].split("def draw_pigpen_diamond_key", 1)[0]
+        self.assertIn('if kind == "x":', pigpen)
+        self.assertIn("rotate_point", pigpen)
+        self.assertNotIn("pos % 4", pigpen)
 
     def test_reference_and_open_font_are_bundled(self):
         parchment = REPO_ROOT / "bot" / "quest" / "source" / "n3_parchment.png"
