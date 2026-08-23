@@ -31,6 +31,8 @@ class N3CardStyleTests(unittest.TestCase):
         self.assertIn("width=7", n3)
         self.assertIn("draw_pigpen_diamond_key", n3)
         self.assertIn('letters="ТУФХЦЧШЩЪ"', source)
+        self.assertIn("draw_pigpen_square_key", n3)
+        self.assertIn('letters="АБВГДЕЖЗИ"', source)
         self.assertNotIn("А теперь — загадка", n3)
         self.assertIn("parchment_page()", n3)
         self.assertIn("script_font(", n3)

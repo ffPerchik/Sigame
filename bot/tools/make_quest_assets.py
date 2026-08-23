@@ -264,6 +264,36 @@ def draw_pigpen_diamond_key(
         )
 
 
+def draw_pigpen_square_key(
+    draw: ImageDraw.ImageDraw,
+    center: tuple[int, int],
+    cell=42,
+    color=(58, 37, 23),
+    width=5,
+    letters="АБВГДЕЖЗИ",
+):
+    """Прямая решётка 3×3 с первыми девятью буквами алфавита."""
+    if len(letters) != 9:
+        raise ValueError("Для квадратной решётки нужны ровно 9 букв")
+    cx, cy = center
+    half = 1.5 * cell
+    for index in range(4):
+        offset = -half + index * cell
+        draw.line((cx + offset, cy - half, cx + offset, cy + half), fill=color, width=width)
+        draw.line((cx - half, cy + offset, cx + half, cy + offset), fill=color, width=width)
+
+    letter_font = script_font(max(18, int(cell * 0.64)))
+    for position, letter in enumerate(letters):
+        row, column = divmod(position, 3)
+        draw.text(
+            (cx + (column - 1) * cell, cy + (row - 1) * cell),
+            letter,
+            fill=color,
+            font=letter_font,
+            anchor="mm",
+        )
+
+
 def _n1_still() -> Image.Image:
     """Свой кадр для N1 — bot/quest/source/n1_carrier.jpg, не финал SIGame."""
     src = BOT_ROOT / "quest" / "source" / "n1_carrier.jpg"
@@ -629,8 +659,9 @@ def make_n3():
     )
     page1.paste(rotated_message, (315, 655), rotated_message)
 
-    # Ромбическая таблица 3×3 дополняет показанную сверху прямую решётку.
+    # Слева — ромбическая третья девятка, справа — прямая первая девятка.
     draw_pigpen_diamond_key(draw, (175, 1305), cell=42, color=ink, width=6)
+    draw_pigpen_square_key(draw, (820, 1305), cell=42, color=ink, width=6)
     page1.save(OUT / "artifact_3a.png", optimize=True)
 
     # Лист II: никаких названий метода — только след из трёх линий.
