@@ -225,8 +225,11 @@ def draw_pigpen_diamond_key(
     cell=34,
     color=(58, 37, 23),
     width=5,
+    letters="ТУФХЦЧШЩЪ",
 ):
-    """Ромбическая решётка 3×3 — ключ ко второй половине алфавита."""
+    """Ромбическая решётка 3×3 с буквами третьей девятки алфавита."""
+    if len(letters) != 9:
+        raise ValueError("Для ромбической решётки нужны ровно 9 букв")
     cx, cy = center
     half = 1.5 * cell
     root_half = 2 ** -0.5
@@ -244,6 +247,21 @@ def draw_pigpen_diamond_key(
         horizontal = (*rotate_point(cx - half, cy + offset), *rotate_point(cx + half, cy + offset))
         draw.line(vertical, fill=color, width=width)
         draw.line(horizontal, fill=color, width=width)
+
+    letter_font = script_font(max(18, int(cell * 0.64)))
+    for position, letter in enumerate(letters):
+        row, column = divmod(position, 3)
+        letter_x, letter_y = rotate_point(
+            cx + (column - 1) * cell,
+            cy + (row - 1) * cell,
+        )
+        draw.text(
+            (letter_x, letter_y),
+            letter,
+            fill=color,
+            font=letter_font,
+            anchor="mm",
+        )
 
 
 def _n1_still() -> Image.Image:
