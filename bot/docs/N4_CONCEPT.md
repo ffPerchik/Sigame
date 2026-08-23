@@ -38,6 +38,48 @@ AI-видео **не** рисует текст — поэтому:
   туда в посте ляжет QR-плакат.
 - Людей крупным планом — избегать.
 
+### Промт для нейросети
+
+Если генератор делает короткие клипы (5–10 с) — сгенерируй два и пришли оба:
+клип A (улица) и клип B (стена). Я склею.
+
+**Основной промт (EN, клип A — прогулка):**
+
+> Nighttime quiet city street, first-person view walking slowly forward at
+> a calm steady pace, wet asphalt reflecting neon shop lights, parked cars,
+> distant silhouettes of people far away, cinematic realistic footage,
+> slight camera noise and grain, moody urban atmosphere, empty street ahead,
+> no text, no captions, no watermarks, no logos. Aspect 16:9, 24fps.
+
+**Клип B — финальная стена (критично для QR):**
+
+> Static security camera shot of an empty brick wall at night, fixed camera
+> with no movement, single dim streetlight illuminating a large blank wall
+> surface in the center of the frame, slight film grain, realistic CCTV
+> footage, desaturated colors, no people, no text, no captions, no watermarks.
+> Aspect 16:9, 24fps.
+
+**Вариант одним клипом (если генератор тянет 20+ с):**
+
+> Realistic CCTV security camera footage, night city street, slow smooth
+> forward dolly along an empty sidewalk, wet asphalt reflections, dim
+> streetlights, the camera gradually approaches and then holds steady on a
+> large empty blank wall for the last several seconds, fixed static frame at
+> the end, cinematic grain, no people in focus, no text, no captions,
+> no watermarks. Aspect 16:9.
+
+**Негатив-промт (если поддерживается):**
+
+> text, captions, subtitles, watermark, logo, letters, signs with readable
+> writing, crowds, close-up faces, fast camera motion, shaky footage,
+> daylight, cartoon, anime
+
+### Настройки
+- Разрешение: максимально доступное (≥1080p), 16:9.
+- Движение камеры: минимальное; в клипе B — строго нулевое.
+- Если есть seed — зафиксируй и запиши, чтобы можно было перегенерить похоже.
+
+
 ## Пост-обработка (мой инструмент)
 
 1. Оверлей: `REC ● CAM-3` + бегущий таймкод.
