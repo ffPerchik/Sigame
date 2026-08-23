@@ -272,13 +272,12 @@ def draw_pigpen_square_key(
     width=5,
     letters="АБВГДЕЖЗИ",
 ):
-    """Прямая решётка 3×3 с первыми девятью буквами алфавита."""
+    """Открытая решётка 3×3 с первыми буквами — без внешней обводки."""
     if len(letters) != 9:
         raise ValueError("Для квадратной решётки нужны ровно 9 букв")
     cx, cy = center
     half = 1.5 * cell
-    for index in range(4):
-        offset = -half + index * cell
+    for offset in (-cell / 2, cell / 2):
         draw.line((cx + offset, cy - half, cx + offset, cy + half), fill=color, width=width)
         draw.line((cx - half, cy + offset, cx + half, cy + offset), fill=color, width=width)
 
