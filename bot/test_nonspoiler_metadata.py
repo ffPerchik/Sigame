@@ -62,7 +62,6 @@ class NonSpoilerMetadataTests(unittest.TestCase):
             "вычитай", "декодируй", "пиши", "разложи", "первые пять по порядку",
         ):
             self.assertNotIn(direct_instruction, combined)
-        self.assertIn("первое слово всё ещё с тобой", combined)
         self.assertIn("алфавит только с одной стороны", combined)
 
     def test_player_facing_assets_have_neutral_names(self):

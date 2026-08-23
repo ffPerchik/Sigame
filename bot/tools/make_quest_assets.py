@@ -628,11 +628,11 @@ def make_n2():
 
 # ===================================================================== N3
 def make_n3():
-    """Четыре реалистичных листа: pigpen → rail → Vigenere → book cipher."""
+    """Четыре реалистичных листа: pigpen → rail → Polybius → book cipher."""
     word1 = "РЕШЕТКА"
     crib = "СИКССЕВЕН"
-    # Длинная фраза не позволяет угадать ВИЖНЕР как простую анаграмму.
-    rail_plain = "НАЗВАНИЕСЛЕДУЮЩЕГОШИФРАВИЖНЕР"
+    # Рельсы называют новый метод, не повторяя Виженера из N2.
+    rail_plain = "СЛЕДУЮЩИЙШИФРНОСИТИМЯПОЛИБИЯ"
     rail_c = rail_fence_enc(rail_plain, 3)
     rail_pattern = [index % 4 if index % 4 <= 2 else 4 - index % 4 for index in range(len(rail_plain))]
     rail_counts = [rail_pattern.count(rail) for rail in range(3)]
@@ -641,10 +641,17 @@ def make_n3():
     for count in rail_counts:
         rail_rows.append(rail_c[rail_cursor:rail_cursor + count])
         rail_cursor += count
-    assert rail_counts == [8, 14, 7]
+    assert rail_counts == [7, 14, 7]
     assert "".join(rail_rows) == rail_c
-    vig_plain = "СТРОФА"
-    vig_c = vigenere(vig_plain, word1)
+
+    polybius_plain = "СТРОФА"
+    polybius_alphabet = "".join(dict.fromkeys(word1 + RU_WITH_YO))
+    polybius_pairs = []
+    for letter in polybius_plain:
+        index = polybius_alphabet.index(letter)
+        polybius_pairs.append(f"{index // 6 + 1}{index % 6 + 1}")
+    assert len(polybius_alphabet) == 33
+    assert polybius_pairs == ["43", "14", "11", "41", "45", "16"]
     stanza = [
         "Серый иней трогает камни",        # 1.2 И
         "В саду свет едва дышит",          # 2.3 С
@@ -734,14 +741,32 @@ def make_n3():
     centered_text(draw, "три следа — одна строка", 1240, script_font(48), faded_ink)
     page2.save(OUT / "artifact_3b.png", optimize=True)
 
-    # Лист III: предыдущий ответ подсказывает способ, первый — повторяющееся слово.
+    # Лист III: квадрат Полибия 6×6 начинается с уникальных букв первого ответа.
     page3 = parchment_page(PARCHMENT_SOURCE_3)
     draw = ImageDraw.Draw(page3)
-    centered_text(draw, "Лист III", 105, script_font(82), ink)
-    centered_text(draw, "на полях: «первое слово всё ещё с тобой»", 245, script_font(40), faded_ink)
-    centered_text(draw, vig_c, 610, script_font(142), ink)
-    draw.line((210, 830, 815, 830), fill=faded_ink, width=2)
-    centered_text(draw, "повторяй, пока строка не заговорит", 910, script_font(46), faded_ink)
+    centered_text(draw, "Лист III", 85, script_font(82), ink)
+    centered_text(draw, "на полях: «первое слово начинает алфавит»", 205, script_font(40), faded_ink)
+
+    grid_x, grid_y, cell = 245, 355, 85
+    grid_size = cell * 6
+    label_font = script_font(32)
+    for index in range(7):
+        offset = index * cell
+        draw.line((grid_x + offset, grid_y, grid_x + offset, grid_y + grid_size), fill=ink, width=3)
+        draw.line((grid_x, grid_y + offset, grid_x + grid_size, grid_y + offset), fill=ink, width=3)
+    for index in range(6):
+        draw.text(
+            (grid_x + index * cell + cell / 2, grid_y - 35),
+            str(index + 1), fill=faded_ink, font=label_font, anchor="mm",
+        )
+        draw.text(
+            (grid_x - 32, grid_y + index * cell + cell / 2),
+            str(index + 1), fill=faded_ink, font=label_font, anchor="mm",
+        )
+
+    centered_text(draw, "33 буквы, включая ё", 930, script_font(40), faded_ink)
+    centered_text(draw, "  ".join(polybius_pairs), 1050, script_font(82), accent)
+    centered_text(draw, "сначала строка, потом столбец", 1195, script_font(44), faded_ink)
     page3.save(OUT / "artifact_3c.png", optimize=True)
 
     # Лист IV: книжные координаты остаются частью самого рукописного листа.
@@ -758,7 +783,7 @@ def make_n3():
 
     print(f"  N3  pigpen {word1}; crib {crib}")
     print(f"  N3  rail {rail_plain} → {rail_c}")
-    print(f"  N3  vig key={word1} {vig_plain} → {vig_c}")
+    print(f"  N3  polybius key={word1} {polybius_plain} → {' '.join(polybius_pairs)}")
     print(f"  N3  book {coordinates} → {''.join(got)}")
 
 

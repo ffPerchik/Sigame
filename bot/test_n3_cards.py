@@ -58,16 +58,20 @@ class N3CardStyleTests(unittest.TestCase):
         self.assertNotIn("pos % 4", pigpen)
 
     def test_second_sheet_hides_the_answer_in_a_full_sentence(self):
-        plain = "НАЗВАНИЕСЛЕДУЮЩЕГОШИФРАВИЖНЕР"
+        plain = "СЛЕДУЮЩИЙШИФРНОСИТИМЯПОЛИБИЯ"
         cipher = rail_fence_enc(plain, 3)
-        self.assertEqual(cipher, "НАСУГФИРАВНЕЛДЮЕОИРВЖЕЗИЕЩШАН")
-        self.assertNotIn("ВИЖНЕР", cipher)
+        self.assertEqual(cipher, "СУЙРИЯИЛДЮИШФНСТМПЛБЯЕЩИОИОИ")
+        self.assertNotIn("ПОЛИБИЙ", cipher)
         self.assertEqual(rail_fence_dec(cipher, 3), plain)
 
         source = (REPO_ROOT / "bot" / "tools" / "make_quest_assets.py").read_text(encoding="utf-8")
         n3 = source.split("def make_n3():", 1)[1].split("# ===================================================================== N4", 1)[0]
         self.assertIn(f'rail_plain = "{plain}"', n3)
-        self.assertIn("assert rail_counts == [8, 14, 7]", n3)
+        self.assertIn("assert rail_counts == [7, 14, 7]", n3)
+        self.assertIn('polybius_pairs == ["43", "14", "11", "41", "45", "16"]', n3)
+        self.assertIn("первое слово начинает алфавит", n3)
+        self.assertNotIn("vigenere(", n3)
+        self.assertNotIn("ВИЖНЕР", n3)
 
     def test_reference_and_open_font_are_bundled(self):
         source_dir = REPO_ROOT / "bot" / "quest" / "source"
