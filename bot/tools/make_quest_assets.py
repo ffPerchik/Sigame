@@ -629,8 +629,18 @@ def make_n3():
     """Четыре реалистичных листа: pigpen → rail → Vigenere → book cipher."""
     word1 = "РЕШЕТКА"
     crib = "СИКССЕВЕН"
-    rail_plain = "ВИЖНЕР"
+    # Длинная фраза не позволяет угадать ВИЖНЕР как простую анаграмму.
+    rail_plain = "НАЗВАНИЕСЛЕДУЮЩЕГОШИФРАВИЖНЕР"
     rail_c = rail_fence_enc(rail_plain, 3)
+    rail_pattern = [index % 4 if index % 4 <= 2 else 4 - index % 4 for index in range(len(rail_plain))]
+    rail_counts = [rail_pattern.count(rail) for rail in range(3)]
+    rail_rows = []
+    rail_cursor = 0
+    for count in rail_counts:
+        rail_rows.append(rail_c[rail_cursor:rail_cursor + count])
+        rail_cursor += count
+    assert rail_counts == [8, 14, 7]
+    assert "".join(rail_rows) == rail_c
     vig_plain = "СТРОФА"
     vig_c = vigenere(vig_plain, word1)
     stanza = [
@@ -703,15 +713,23 @@ def make_n3():
     page1 = burn_lower_left_corner(page1)
     page1.save(OUT / "artifact_3a.png", optimize=True)
 
-    # Лист II: никаких названий метода — только след из трёх линий.
+    # Лист II: длинная фраза разложена по трём рельсам — взглядом ответ не угадать.
     page2 = parchment_page()
     draw = ImageDraw.Draw(page2)
     centered_text(draw, "Лист II", 105, script_font(82), ink)
-    centered_text(draw, "строка помнит путь, которым её писали", 235, script_font(42), faded_ink)
-    centered_text(draw, rail_c, 535, script_font(132), ink)
-    for y, offset in ((850, 0), (935, 55), (1020, 0)):
-        draw.arc((145 + offset, y - 65, 880 - offset, y + 65), 185, 355, fill=faded_ink, width=3)
-    centered_text(draw, "три следа — одна строка", 1160, script_font(48), faded_ink)
+    centered_text(draw, "строка помнит путь, которым её писали", 225, script_font(42), faded_ink)
+    for row, y, size in zip(rail_rows, (440, 585, 730), (84, 68, 84)):
+        centered_text(draw, row, y, script_font(size), ink)
+
+    rail_y = (990, 1060, 1130)
+    for y in rail_y:
+        draw.line((145, y, 880, y), fill=(112, 83, 57), width=2)
+    path = []
+    pattern = (0, 1, 2, 1)
+    for index in range(17):
+        path.append((150 + index * 45, rail_y[pattern[index % 4]]))
+    draw.line(path, fill=faded_ink, width=4, joint="curve")
+    centered_text(draw, "три следа — одна строка", 1240, script_font(48), faded_ink)
     page2.save(OUT / "artifact_3b.png", optimize=True)
 
     # Лист III: предыдущий ответ подсказывает способ, первый — повторяющееся слово.
