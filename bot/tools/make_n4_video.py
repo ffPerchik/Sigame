@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """N4 «НАБЛЮДЕНИЕ»: пост-обработка сток-клипа в «архив камеры CAM-3».
 
-Вход: реальная ночная улица (бот/quest/source/*.mp4). Выход:
-  artifact_4a.mp4 — CCTV-запись: REC/таймкод, вспышка-кадр с hex(ШУМ),
-                    финальная «метка» с QR (deep-link CAM3EYE).
-  artifact_4b.png — стоп-кадр метки (запасной артефакт).
-  artifact_4c.png — стоп-кадр вспышки (запасной артефакт).
+Слои (4 загадки):
+  1. Два глитч-кадра с половинами hex(ШУМ): d0 a8 d0 / a3 d0 9c.
+  2. Шесть коротких кадров по одной букве (В З Г Л Я Д, хронологически).
+  3. Описание YouTube: LOG 0C 06 0E 08 01 → hex → A1Z26 → ЛИНЗА.
+  4. Метки: фальшивый QR (CAM3TRAP, сканируется сразу — ловушка) в середине
+     и настоящий отзеркаленный QR (CAM3EYE) в конце.
+
+Выход: artifact_4a.mp4, artifact_4b.png (стоп-кадр метки), artifact_4c.png (глитч).
 
   python3 bot/tools/make_n4_video.py [--input путь.mp4] [--bot-name NAME]
 """
@@ -32,33 +35,30 @@ BOT_DIR = Path(__file__).resolve().parent.parent
 IMAGES = BOT_DIR / "quest" / "images"
 FONTS = BOT_DIR / "tools" / "fonts"
 
-W, H = 1920, 1080          # итог: апскейл до 1080p (QR должен пережить YouTube)
-FLASH_AT = 0.55            # доля ролика, где вспышка
-FLASH_LEN = 12             # кадров (~0.5 c при 25 fps)
-MARK_SECS = 4.0            # сколько секунд в конце видна метка
-HEX_WORD = " ".join(f"{b:02x}" for b in "ШУМ".encode("utf-8"))  # d0a8 d0a3 d09c
+W, H = 1920, 1080
+FPS = 25
+FLASH1_AT = 0.40           # доля ролика: первый глитч-кадр (d0 a8 d0)
+FLASH2_AT = 0.72           # второй глитч-кадр (a3 d0 9c)
+FLASH_LEN = 12             # кадров (~0.5 c)
+LETTERS = "ВЗГЛЯД"
+LETTER_AT = [0.16, 0.27, 0.38, 0.48, 0.68, 0.79]   # доли ролика
+LETTER_LEN = 4             # кадров (~0.16 c)
+TRAP_AT, TRAP_LEN = 0.57, 35   # фальшивая метка (1.4 c)
+MARK_SECS = 4.0            # настоящая метка в конце
 QR_CODE = "CAM3EYE"
+TRAP_CODE = "CAM3TRAP"
+HEX1, HEX2 = "d0 a8 d0", "a3 d0 9c"
 
 
 def ffmpeg() -> str | None:
-    for candidate in (shutil.which("ffmpeg"),):
-        if candidate:
-            return candidate
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
     try:
         import imageio_ffmpeg
         return imageio_ffmpeg.get_ffmpeg_exe()
     except Exception:
         return None
-
-
-def font(name: str, size: int) -> ImageFont.FreeTypeFont:
-    key = (name, size)
-    if key not in _FONT_CACHE:
-        _FONT_CACHE[key] = ImageFont.truetype(str(FONTS / name), size)
-    return _FONT_CACHE[key]
-
-
-_FONT_CACHE: dict = {}
 
 
 def run_ff(args: list[str]) -> None:
@@ -68,86 +68,96 @@ def run_ff(args: list[str]) -> None:
     subprocess.run([exe, "-hide_banner", "-loglevel", "error", *args], check=True)
 
 
-def make_qr(bot_name: str) -> Image.Image:
-    url = f"https://t.me/{bot_name}?start={QR_CODE}"
+_FONT_CACHE: dict = {}
+
+
+def font(name: str, size: int) -> ImageFont.FreeTypeFont:
+    key = (name, size)
+    if key not in _FONT_CACHE:
+        _FONT_CACHE[key] = ImageFont.truetype(str(FONTS / name), size)
+    return _FONT_CACHE[key]
+
+
+def mono(size: int) -> ImageFont.FreeTypeFont:
+    return font("DejaVuSansMono-Bold.ttf", size)
+
+
+def make_qr(text: str) -> Image.Image:
     qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_Q, border=2)
-    qr.add_data(url)
+    qr.add_data(text)
     qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
-    print(f"  QR ← {url}")
-    return img
+    return qr.make_image(fill_color="black", back_color="white").convert("RGB")
 
 
-def hud(img: Image.Image, idx: int, fps: int) -> None:
-    """CCTV-оверлей: REC, камера, таймкод, лёгкая обесцвеченность."""
+def hud(img: Image.Image, idx: int) -> None:
     d = ImageDraw.Draw(img, "RGBA")
-    total = idx / fps
+    total = idx / FPS
     hh, mm, ss = 22, 41, 7 + int(total)
-    ff = int((total % 1) * fps)
+    ff = int((total % 1) * FPS)
     ts = f"{hh:02d}:{mm:02d}:{ss:02d}:{ff:02d}"
-
-    # REC ●
     d.ellipse((52, 48, 78, 74), fill=(220, 40, 40))
-    d.text((96, 46), "REC", fill=(240, 240, 240), font=font("DejaVuSansMono-Bold.ttf", 40))
+    d.text((96, 46), "REC", fill=(240, 240, 240), font=mono(40))
     cam = "CAM-3 · SECTOR 4 · ARGVS"
-    tw = d.textlength(cam, font=font("DejaVuSansMono-Bold.ttf", 32))
-    d.text((W - 56 - tw, 50), cam, fill=(240, 240, 240), font=font("DejaVuSansMono-Bold.ttf", 32))
-    tw = d.textlength(ts, font=font("DejaVuSansMono-Bold.ttf", 36))
-    d.text((W - 56 - tw, H - 78), ts, fill=(230, 230, 230), font=font("DejaVuSansMono-Bold.ttf", 36))
+    d.text((W - 56 - d.textlength(cam, font=mono(32)), 50), cam,
+           fill=(240, 240, 240), font=mono(32))
+    d.text((W - 56 - d.textlength(ts, font=mono(36)), H - 78), ts,
+           fill=(230, 230, 230), font=mono(36))
 
 
-def flash_frame(idx: int) -> Image.Image:
+def flash_frame(idx: int, hex_text: str) -> Image.Image:
     img = Image.new("RGB", (W, H), (6, 6, 8))
     d = ImageDraw.Draw(img)
-    # глитч-полосы
     rng = np.random.default_rng(1000 + idx)
     for y in rng.integers(0, H, 26):
-        x0 = int(rng.integers(0, W // 2))
-        ln = int(rng.integers(120, 700))
-        d.rectangle((x0, int(y), x0 + ln, int(y) + int(rng.integers(2, 6))),
-                    fill=(70, 70, 80))
-    d.text(((W - ImageFont.truetype(str(FONTS / "DejaVuSansMono-Bold.ttf"), 96).getlength(HEX_WORD)) // 2, 460),
-           HEX_WORD, fill=(235, 235, 235), font=font("DejaVuSansMono-Bold.ttf", 96))
-    d.text((W // 2 - 60, 600), "UTF-8", fill=(120, 120, 120), font=font("DejaVuSansMono-Bold.ttf", 44))
+        x0, ln = int(rng.integers(0, W // 2)), int(rng.integers(120, 700))
+        d.rectangle((x0, int(y), x0 + ln, int(y) + int(rng.integers(2, 6))), fill=(70, 70, 80))
+    d.text(((W - mono(96).getlength(hex_text)) // 2, 460), hex_text,
+           fill=(235, 235, 235), font=mono(96))
+    d.text((W // 2 - 60, 600), "UTF-8", fill=(120, 120, 120), font=mono(44))
     return img
 
 
-def mark_overlay(base: Image.Image, qr: Image.Image, alpha: float) -> None:
-    """Плакат-метка с QR поверх затемнённого кадра."""
-    if alpha <= 0:
-        return
-    if alpha < 1:
-        dark = ImageEnhance.Brightness(base).enhance(0.55 + 0.45 * (1 - alpha))
-        base.paste(dark, (0, 0))
-    else:
-        base.paste(ImageEnhance.Brightness(base).enhance(0.5), (0, 0))
+def letter_glow(img: Image.Image, letter: str) -> None:
+    """Одна полупрозрачная буква в правом нижнем углу (видна на паузе)."""
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(glow)
+    d.text((W - 210, H - 210), letter, fill=(255, 60, 60, 110), font=mono(150))
+    img.paste(Image.alpha_composite(img.convert("RGBA"), glow).convert("RGB"), (0, 0))
 
+
+def poster(qr_img: Image.Image, header: str) -> Image.Image:
     pw, ph = 720, 950
-    px, py = (W - pw) // 2 + 210, (H - ph) // 2
-    poster = Image.new("RGBA", (pw, ph), (245, 245, 245, 255))
-    pd = ImageDraw.Draw(poster)
+    p = Image.new("RGB", (pw, ph), (245, 245, 245))
+    pd = ImageDraw.Draw(p)
     pd.rectangle((0, 0, pw - 1, 96), fill=(160, 30, 30))
-    head = "ARGVS-1001 · МЕТКА 4/6"
-    pd.text(((pw - ImageFont.truetype(str(FONTS / "DejaVuSansMono-Bold.ttf"), 40).getlength(head)) // 2, 28),
-            head, fill=(245, 245, 245), font=font("DejaVuSansMono-Bold.ttf", 40))
-    qr_s = qr.resize((560, 560), Image.NEAREST)
-    poster.paste(qr_s, ((pw - 560) // 2, 150))
-    pd.text(((pw - ImageFont.truetype(str(FONTS / "DejaVuSansMono-Bold.ttf"), 36).getlength("СКАН С ЭКРАНА")) // 2, ph - 140),
-            "СКАН С ЭКРАНА", fill=(20, 20, 20), font=font("DejaVuSansMono-Bold.ttf", 36))
-    pd.text(((pw - ImageFont.truetype(str(FONTS / "DejaVuSansMono-Bold.ttf"), 30).getlength("CAM-3")) // 2, ph - 80),
-            "CAM-3", fill=(120, 120, 120), font=font("DejaVuSansMono-Bold.ttf", 30))
+    pd.text(((pw - mono(40).getlength(header)) // 2, 28), header,
+            fill=(245, 245, 245), font=mono(40))
+    p.paste(qr_img.resize((560, 560), Image.NEAREST), ((pw - 560) // 2, 150))
+    pd.text(((pw - mono(36).getlength("СКАН С ЭКРАНА")) // 2, ph - 140),
+            "СКАН С ЭКРАНА", fill=(20, 20, 20), font=mono(36))
+    pd.text(((pw - mono(30).getlength("CAM-3")) // 2, ph - 80),
+            "CAM-3", fill=(120, 120, 120), font=mono(30))
     pd.rectangle((0, 0, pw - 1, ph - 1), outline=(20, 20, 20), width=6)
+    return p
 
+
+def paste_poster(base: Image.Image, p: Image.Image, alpha: float) -> None:
+    px, py = (W - p.width) // 2 + 210, (H - p.height) // 2
     if alpha < 1:
-        poster.putalpha(int(255 * alpha))
-    base.paste(poster, (px, py), poster)
-
-    # прицельные уголки кадра
+        alpha_img = Image.new("L", p.size, int(255 * alpha))
+        base.paste(p.convert("RGBA"), (px, py), alpha_img)
+    else:
+        base.paste(p, (px, py))
     d = ImageDraw.Draw(base, "RGBA")
     L, c = 70, (220, 60, 60, int(255 * min(1, alpha + 0.2)))
     for cx, cy, dx, dy in ((56, 56, 1, 1), (W - 56, 56, -1, 1), (56, H - 56, 1, -1), (W - 56, H - 56, -1, -1)):
         d.line((cx, cy, cx + dx * L, cy), fill=c, width=6)
         d.line((cx, cy, cx, cy + dy * L), fill=c, width=6)
+
+
+def dim(base: Image.Image, alpha: float, k: float = 0.55) -> None:
+    """Плавное затемнение до доли k (alpha=1 → полностью затемнён)."""
+    base.paste(ImageEnhance.Brightness(base).enhance(1 - k * alpha), (0, 0))
 
 
 def main() -> None:
@@ -162,47 +172,63 @@ def main() -> None:
         sys.exit(f"нет исходника: {src}")
     print(f"N4: исходник {src.name}")
 
-    qr = make_qr(args.bot_name)
+    real_qr = make_qr(f"https://t.me/{args.bot_name}?start={QR_CODE}")
+    trap_qr = make_qr(f"https://t.me/{args.bot_name}?start={TRAP_CODE}")
+    real_poster = poster(real_qr, "ARGVS-1001 · МЕТКА 4/6")          # зеркалим при вставке
+    trap_poster = poster(trap_qr, "ARGVS-1001 · МЕТКА 4/6")          # ловушка — как настоящая
+    print(f"  QR ← {args.bot_name}?start={QR_CODE} (зеркальный) и ловушка {TRAP_CODE}")
 
     with tempfile.TemporaryDirectory() as td:
         tdir = Path(td)
         raw, out_frames = tdir / "raw", tdir / "out"
         raw.mkdir()
         out_frames.mkdir()
-        # 1) кадры из исходника
         run_ff(["-i", str(src), "-vf", f"scale={W}:{H}:flags=lanczos", str(raw / "f%04d.png")])
         frames = sorted(raw.glob("f*.png"))
-        n, fps = len(frames), 25
-        print(f"  кадров: {n} ({n / fps:.1f} c)")
+        n = len(frames)
+        print(f"  кадров: {n} ({n / FPS:.1f} c)")
 
-        flash_i = int(n * FLASH_AT)
-        mark_from = n - int(MARK_SECS * fps)
+        f1 = int(n * FLASH1_AT)
+        f2 = int(n * FLASH2_AT)
+        letter_i = [int(n * x) for x in LETTER_AT]
+        trap_i = int(n * TRAP_AT)
+        mark_from = n - int(MARK_SECS * FPS)
 
         for i, fp in enumerate(frames):
-            if flash_i <= i < flash_i + FLASH_LEN:
-                img = flash_frame(i)
+            if f1 <= i < f1 + FLASH_LEN:
+                img = flash_frame(i, HEX1)
+            elif f2 <= i < f2 + FLASH_LEN:
+                img = flash_frame(i, HEX2)
             else:
                 img = Image.open(fp).convert("RGB")
                 img = ImageEnhance.Color(img).enhance(0.72)
-                hud(img, i, fps)
-                if i >= mark_from:
-                    t = (i - mark_from) / fps
-                    mark_overlay(img, qr, min(1.0, t / 0.4))
+                hud(img, i)
+                for k, start in enumerate(letter_i):
+                    if start <= i < start + LETTER_LEN:
+                        letter_glow(img, LETTERS[k])
+                if trap_i <= i < trap_i + TRAP_LEN:
+                    t = (i - trap_i) / FPS
+                    dim(img, min(1.0, t / 0.3))
+                    paste_poster(img, trap_poster, alpha=min(1.0, t / 0.3))
+                elif i >= mark_from:
+                    t = (i - mark_from) / FPS
+                    dim(img, min(1.0, t / 0.4))
+                    paste_poster(img, real_poster.transpose(Image.FLIP_LEFT_RIGHT),
+                                 alpha=min(1.0, t / 0.4))
             img.save(out_frames / f"f{i:04d}.png")
 
-        # 2) mp4
-        run_ff(["-y", "-framerate", str(fps), "-i", str(out_frames / "f%04d.png"),
+        run_ff(["-y", "-framerate", str(FPS), "-i", str(out_frames / "f%04d.png"),
                 "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p",
                 str(IMAGES / "artifact_4a.mp4")])
 
-        # 3) запасные стоп-кадры
-        Image.open(out_frames / f"f{mark_from + int(0.5 * fps):04d}.png").save(
+        Image.open(out_frames / f"f{mark_from + int(0.6 * FPS):04d}.png").save(
             IMAGES / "artifact_4b.png", optimize=True)
-        Image.open(out_frames / f"f{flash_i:04d}.png").save(
+        Image.open(out_frames / f"f{f1:04d}.png").save(
             IMAGES / "artifact_4c.png", optimize=True)
 
-    print(f"  N4 видео: artifact_4a.mp4  вспышка@{flash_i} ({HEX_WORD} = ШУМ), QR-код {QR_CODE}")
-    print(f"  метка последние {MARK_SECS} c; стоп-кадры: artifact_4b.png, artifact_4c.png")
+    print(f"  глитчи: @{f1} «{HEX1}» и @{f2} «{HEX2}» → ШУМ")
+    print(f"  буквы {LETTERS} на кадрах {letter_i}")
+    print(f"  ловушка {TRAP_CODE} @{trap_i}; метка (зеркало) последние {MARK_SECS} c")
 
 
 if __name__ == "__main__":

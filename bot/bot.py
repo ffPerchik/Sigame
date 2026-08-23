@@ -447,6 +447,20 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
         payload = (command.args or "").strip()
         if payload:
             st = quest.get_stage(player["stage"]) or {}
+            traps = st.get("trap_accept") or []
+            if isinstance(traps, str):
+                traps = [traps]
+            if traps and quest.validate(traps, payload):
+                db.log_event(uid, "qr_trap", payload)
+                trap_text = st.get("trap_text")
+                if trap_text:
+                    await send_timed_messages(
+                        [{"speaker": "argus", "text": trap_text, "delay": 0}],
+                        lambda line: message.answer(line),
+                    )
+                else:
+                    await message.answer(T.WRONG)
+                return
             if st.get("qr") and quest.validate(st.get("accept"), payload):
                 db.log_event(uid, "qr_scan", payload)
                 await message.answer(st.get("correct_text", T.CORRECT))
