@@ -29,6 +29,7 @@ SCRIPT_FONT = BOT_ROOT / "tools" / "fonts" / "MarckScript-Regular.ttf"
 PARCHMENT_SOURCE = BOT_ROOT / "quest" / "source" / "n3_parchment.png"
 PARCHMENT_SOURCE_2 = BOT_ROOT / "quest" / "source" / "n3_parchment_2.png"
 PARCHMENT_SOURCE_3 = BOT_ROOT / "quest" / "source" / "n3_parchment_3.png"
+PARCHMENT_SOURCE_4 = BOT_ROOT / "quest" / "source" / "n3_parchment_4.png"
 
 FONTS = [
     str(BOT_ROOT / "tools" / "fonts" / "DejaVuSans-Bold.ttf"),
@@ -794,7 +795,7 @@ def make_n3():
     page3.save(OUT / "artifact_3c.png", optimize=True)
 
     # Лист IV: книжные координаты остаются частью самого рукописного листа.
-    page4 = parchment_page()
+    page4 = parchment_page(PARCHMENT_SOURCE_4)
     draw = ImageDraw.Draw(page4)
     centered_text(draw, "Лист IV", 95, script_font(82), ink)
     centered_text(draw, "шесть строк из старого архива", 205, script_font(42), faded_ink)
@@ -999,7 +1000,7 @@ def write_readme():
 N2 использует связанную цепочку `n2_1.wav` → `n2_2.wav` → `n2_3.wav`;
 в последнем файле скрытая спектрограмма наложена на слышимый вальс.
 Файлы N3–N6 называются нейтрально (`artifact_*`), чтобы имя не выдавало метод решения.
-Листы N3 используют три разных фона `quest/source/n3_parchment*.png`; листы II и III имеют собственные пергаменты. Шрифт — Marck Script (SIL OFL 1.1).
+Все четыре листа N3 используют отдельные фоны `quest/source/n3_parchment*.png`. Шрифт — Marck Script (SIL OFL 1.1).
 """,
         encoding="utf-8",
     )

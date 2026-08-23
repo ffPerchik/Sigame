@@ -46,6 +46,7 @@ class N3CardStyleTests(unittest.TestCase):
         self.assertIn("parchment_page()", n3)
         self.assertIn("parchment_page(PARCHMENT_SOURCE_2)", n3)
         self.assertIn("parchment_page(PARCHMENT_SOURCE_3)", n3)
+        self.assertIn("parchment_page(PARCHMENT_SOURCE_4)", n3)
         self.assertIn("script_font(", n3)
         self.assertNotIn("hack_glitch", n3)
         self.assertNotIn("образец АБВ", n3)
@@ -82,13 +83,14 @@ class N3CardStyleTests(unittest.TestCase):
         source_dir = REPO_ROOT / "bot" / "quest" / "source"
         parchments = [source_dir / name for name in (
             "n3_parchment.png", "n3_parchment_2.png", "n3_parchment_3.png",
+            "n3_parchment_4.png",
         )]
         for parchment in parchments:
             raw = parchment.read_bytes()
             self.assertGreater(len(raw), 100_000)
             self.assertEqual(raw[:8], b"\x89PNG\r\n\x1a\n")
             self.assertEqual(struct.unpack(">II", raw[16:24]), (848, 1264))
-        self.assertEqual(len({parchment.read_bytes() for parchment in parchments}), 3)
+        self.assertEqual(len({parchment.read_bytes() for parchment in parchments}), 4)
 
         script_font = REPO_ROOT / "bot" / "tools" / "fonts" / "MarckScript-Regular.ttf"
         license_file = REPO_ROOT / "bot" / "tools" / "fonts" / "OFL-MarckScript.txt"
