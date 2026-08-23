@@ -747,7 +747,7 @@ def make_n3():
     centered_text(draw, "Лист III", 85, script_font(82), ink)
 
     # Настоящая пометка на полях: вся строка повёрнута на 90° вдоль левого края.
-    margin_text = "на полях: «первое слово начинает алфавит»"
+    margin_text = "«первое слово начинает алфавит»"
     margin_font = script_font(40)
     margin_box = draw.textbbox((0, 0), margin_text, font=margin_font)
     margin_layer = Image.new(
