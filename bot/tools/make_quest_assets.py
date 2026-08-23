@@ -653,18 +653,19 @@ def make_n3():
         polybius_pairs.append(f"{index // 6 + 1}{index % 6 + 1}")
     assert len(polybius_alphabet) == 33
     assert polybius_pairs == ["43", "14", "11", "41", "45", "16"]
-    # Три предыдущих ответа становятся инструкцией к финалу:
+    # Три предыдущих ответа становятся одной механикой финала:
     # РЕШЕТКА = 6×6 слов, ПОЛИБИЙ = строка.столбец, СТРОФА = материал.
+    # Координаты, которыми на листе III было записано СТРОФА, используются повторно.
     stanza = [
-        "Серый иней трогает старые камни тихо",       # 1.2 И
-        "В саду свет едва дышит ночью",               # 2.3 С
-        "Под крышей тишина лежит до рассвета",        # 3.3 Т
-        "Снова иней на ветках хранит следы",          # 4.2 И
-        "В этой ночи открыт старый проход",           # 5.3 Н
-        "Храни архив как начало нашей памяти",        # 6.2 А
+        "Тихий ветер гасит свет пряча архив",              # 1.1 Т, 1.4 С, 1.6 А
+        "Старые стены помнят шаги давних гостей",
+        "Под крышей дремлет пыль немого времени",
+        "Иней снова ищет след ночной памяти",             # 4.1 И, 4.3 И, 4.5 Н
+        "Луна тихо гладит старую пустую страницу",
+        "К рассвету рукопись опять станет тише",
     ]
     assert all(len(line.split()) == 6 for line in stanza)
-    picks = [(1, 2), (2, 3), (3, 3), (4, 2), (5, 3), (6, 2)]
+    picks = [(int(pair[0]), int(pair[1])) for pair in polybius_pairs]
     got = []
     for line_index, word_index in picks:
         word = stanza[line_index - 1].split()[word_index - 1]
@@ -802,19 +803,18 @@ def make_n3():
     draw = ImageDraw.Draw(page4)
     centered_text(draw, "Лист IV", 95, script_font(82), ink)
     centered_text(draw, "три прежних слова — одна инструкция", 205, script_font(42), faded_ink)
-    line_font = script_font(42)
-    number_font = script_font(40)
+    line_font = script_font(36)
+    number_font = script_font(36)
     for index, line in enumerate(stanza, start=1):
         y = 315 + (index - 1) * 125
         draw.text((120, y), f"{index}.", fill=ink, font=number_font)
         draw.text((190, y), line, fill=ink, font=line_font)
     coordinates = "   ".join(f"{line}.{word}" for line, word in picks)
-    centered_text(draw, coordinates, 1090, script_font(60), accent)
     centered_text(
         draw,
-        "первое — форма · второе — путь · третье — текст",
-        1225,
-        script_font(36),
+        "шесть пар с прошлого листа ещё не закончили путь",
+        1165,
+        script_font(38),
         faded_ink,
     )
     page4.save(OUT / "artifact_3d.png", optimize=True)

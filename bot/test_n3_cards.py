@@ -86,7 +86,9 @@ class N3CardStyleTests(unittest.TestCase):
         self.assertIn("ПОЛИБИЙ = строка.столбец", n3)
         self.assertIn("СТРОФА = материал", n3)
         self.assertIn("assert all(len(line.split()) == 6 for line in stanza)", n3)
-        self.assertIn("первое — форма · второе — путь · третье — текст", n3)
+        self.assertIn("picks = [(int(pair[0]), int(pair[1])) for pair in polybius_pairs]", n3)
+        self.assertIn("шесть пар с прошлого листа ещё не закончили путь", n3)
+        self.assertNotIn('centered_text(draw, coordinates', n3)
 
     def test_reference_and_open_font_are_bundled(self):
         source_dir = REPO_ROOT / "bot" / "quest" / "source"
