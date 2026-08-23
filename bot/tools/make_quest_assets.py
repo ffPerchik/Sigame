@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import piexif
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 try:
     from .quest_crypto import (
@@ -241,8 +241,8 @@ def draw_pigpen_diamond_key(
             cy + (dx + dy) * root_half,
         )
 
-    for index in range(4):
-        offset = -half + index * cell
+    # Только внутренние линии: ромб остаётся открытой сеткой без обводки.
+    for offset in (-cell / 2, cell / 2):
         vertical = (*rotate_point(cx + offset, cy - half), *rotate_point(cx + offset, cy + half))
         horizontal = (*rotate_point(cx - half, cy + offset), *rotate_point(cx + half, cy + offset))
         draw.line(vertical, fill=color, width=width)
@@ -291,6 +291,45 @@ def draw_pigpen_square_key(
             font=letter_font,
             anchor="mm",
         )
+
+
+def burn_lower_left_corner(page: Image.Image) -> Image.Image:
+    """Выжигает неровный кусок страницы, скрывая левую половину ромба."""
+    edge = [
+        (48, 1105), (69, 1142), (82, 1180), (116, 1206),
+        (132, 1238), (164, 1263), (153, 1290), (178, 1315),
+        (154, 1343), (166, 1371), (137, 1397), (120, 1430),
+        (88, 1468),
+    ]
+
+    # Мягкий ореол копоти остаётся на сохранившейся бумаге.
+    rgba = page.convert("RGBA")
+    soot = Image.new("RGBA", rgba.size, (0, 0, 0, 0))
+    soot_draw = ImageDraw.Draw(soot)
+    soot_draw.line(edge, fill=(46, 19, 6, 170), width=62, joint="curve")
+    soot = soot.filter(ImageFilter.GaussianBlur(15))
+    rgba = Image.alpha_composite(rgba, soot)
+
+    burned = ImageDraw.Draw(rgba)
+    cutout = [(0, 1090), *edge, (0, 1536)]
+    burned.polygon(cutout, fill=(255, 255, 255, 255))
+
+    # Тонкая угольная кромка поверх размытой копоти — без нарисованной
+    # «коричневой обводки», чтобы прогар сливался с фотографией листа.
+    char = Image.new("RGBA", rgba.size, (0, 0, 0, 0))
+    char_draw = ImageDraw.Draw(char)
+    char_draw.line(edge, fill=(73, 33, 12, 165), width=22, joint="curve")
+    char_draw.line(edge, fill=(19, 9, 4, 235), width=7, joint="curve")
+    for x, y, radius in (
+        (90, 1167, 5), (128, 1221, 4), (170, 1281, 6),
+        (165, 1355, 4), (132, 1411, 6), (92, 1455, 4),
+    ):
+        char_draw.ellipse(
+            (x - radius, y - radius, x + radius, y + radius),
+            fill=(28, 13, 5, 205),
+        )
+    char = char.filter(ImageFilter.GaussianBlur(1.2))
+    return Image.alpha_composite(rgba, char).convert("RGB")
 
 
 def _n1_still() -> Image.Image:
@@ -661,6 +700,7 @@ def make_n3():
     # Слева — ромбическая третья девятка, справа — прямая первая девятка.
     draw_pigpen_diamond_key(draw, (175, 1305), cell=42, color=ink, width=6)
     draw_pigpen_square_key(draw, (820, 1305), cell=42, color=ink, width=6)
+    page1 = burn_lower_left_corner(page1)
     page1.save(OUT / "artifact_3a.png", optimize=True)
 
     # Лист II: никаких названий метода — только след из трёх линий.

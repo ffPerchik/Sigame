@@ -33,9 +33,13 @@ class N3CardStyleTests(unittest.TestCase):
         self.assertIn('letters="ТУФХЦЧШЩЪ"', source)
         self.assertIn("draw_pigpen_square_key", n3)
         self.assertIn('letters="АБВГДЕЖЗИ"', source)
-        square_key = source.split("def draw_pigpen_square_key", 1)[1].split("def _n1_still", 1)[0]
+        diamond_key = source.split("def draw_pigpen_diamond_key", 1)[1].split("def draw_pigpen_square_key", 1)[0]
+        square_key = source.split("def draw_pigpen_square_key", 1)[1].split("def burn_lower_left_corner", 1)[0]
+        self.assertIn("for offset in (-cell / 2, cell / 2):", diamond_key)
         self.assertIn("for offset in (-cell / 2, cell / 2):", square_key)
+        self.assertNotIn("range(4)", diamond_key)
         self.assertNotIn("range(4)", square_key)
+        self.assertIn("burn_lower_left_corner(page1)", n3)
         self.assertNotIn("А теперь — загадка", n3)
         self.assertIn("parchment_page()", n3)
         self.assertIn("script_font(", n3)
