@@ -29,6 +29,29 @@ AI-видео **не** рисует текст — поэтому:
 - весь текст (таймкод, REC, hex-вспышка, QR) накладывается программно
   в пост-обработке — `bot/tools/make_n4_video.py` (напишу).
 
+## Источники видео (сток, лицензии свободные)
+
+Скачивать вручную (CDN стоков недоступны из песочницы). Положить в
+`bot/quest/source/` как `n4_clip_a.mp4` (улица) — дальше вся сборка моя.
+
+Приоритет — статичный ракурс «камеры наблюдения» (не нужна стабилизация,
+QR-плакат ложится на фиксированную область кадра):
+
+1. **Mixkit 4451 «Quiet Tokyo street at night»** — статика, ночь, улица
+   с фасадами (стена под QR есть).
+   https://mixkit.co/free-stock-video/quiet-tokyo-street-at-night-4451/
+   mp4: https://assets.mixkit.co/videos/preview/mixkit-quiet-tokyo-street-at-night-4451-large.mp4
+2. **Mixkit 4331 «Traffic on a rainy night»** — статика, ночь, мокрый асфальт.
+   https://mixkit.co/free-stock-video/traffic-on-a-rainy-night-4331/
+   mp4: https://assets.mixkit.co/videos/preview/mixkit-traffic-on-a-rainy-night-4331-large.mp4
+3. **Pexels 5108891 «View of City Traffic at Night»** — Лондон, 30 c, CC0,
+   витрины и тротуар.
+   https://www.pexels.com/video/view-of-city-traffic-at-night-5108891/
+   mp4: https://www.pexels.com/download/video/5108891/
+4. **Mixkit 4332 «Times Square rainy night»** — запасной, но в кадре
+   много текста (шум для загадки).
+   https://mixkit.co/free-stock-video/times-square-during-a-rainy-night-4332/
+
 ## ТЗ на AI-клип (для генерации)
 
 - 16:9, 1080p, 25–30 fps, 20–40 сек, цвет — вечерний/ночной город.
