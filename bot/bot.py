@@ -442,6 +442,16 @@ async def cmd_start(message: Message, command: CommandStart) -> None:
     uid = message.from_user.id
     player = db.get_player(uid)
     if player is not None:
+        # Deep-link с QR-метки (t.me/<bot>?start=CODE): если код совпадает
+        # с текущей qr-стадией игрока — шаг засчитывается сразу.
+        payload = (command.args or "").strip()
+        if payload:
+            st = quest.get_stage(player["stage"]) or {}
+            if st.get("qr") and quest.validate(st.get("accept"), payload):
+                db.log_event(uid, "qr_scan", payload)
+                await message.answer(st.get("correct_text", T.CORRECT))
+                await advance(uid)
+                return
         await message.answer(T.ALREADY_IN_QUEST)
         return
 

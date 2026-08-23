@@ -827,76 +827,12 @@ def make_n3():
 
 # ===================================================================== N4
 def make_n4():
-    """Видео: вывески Л И Н З А + один кадр HEX(ТЕНЬ) + фрагментированный QR-текст КАДР."""
-    hex_word = "ТЕНЬ".encode("utf-8").hex()
-    signs = list("ЛИНЗА")
-    exe = ffmpeg()
-    frames_dir = OUT / "_n4_frames"
-    frames_dir.mkdir(exist_ok=True)
-    w, h = 960, 540
-    n_frames = 48
-    flash_i = 27
-    for i in range(n_frames):
-        img = Image.new("RGB", (w, h), (18, 20, 28))
-        d = ImageDraw.Draw(img)
-        d.rectangle((0, 400, w, h), fill=(32, 30, 36))
-        d.text((24, 16), f"REC  00:00:{i:02d}", fill=(180, 40, 40), font=font(22))
-        # five shop signs
-        for k, letter in enumerate(signs):
-            x = 40 + k * 185
-            d.rectangle((x, 160, x + 160, 280), outline=(200, 180, 80), width=3)
-            d.text((x + 48, 190), letter, fill=(220, 200, 90), font=font(64))
-        if i == flash_i:
-            img = Image.new("RGB", (w, h), (8, 8, 8))
-            d = ImageDraw.Draw(img)
-            d.text((40, 200), hex_word, fill=(240, 240, 240), font=font(48))
-            d.text((40, 300), "UTF-8", fill=(120, 120, 120), font=font(22))
-        hack_glitch(img, seed=40 + i).save(frames_dir / f"f{i:03d}.png")
+    """N4 «НАБЛЮДЕНИЕ» переехал на реальную съёмку + YouTube + QR.
 
-    mp4 = OUT / "artifact_4a.mp4"
-    if exe:
-        cmd = [
-            exe, "-y", "-hide_banner", "-loglevel", "error",
-            "-framerate", "6", "-i", str(frames_dir / "f%03d.png"),
-            "-c:v", "libx264", "-pix_fmt", "yuv420p", str(mp4),
-        ]
-        subprocess.run(cmd, check=True, timeout=60)
-        print(f"  N4  video {mp4.name}  signs=ЛИНЗА  flash HEX {hex_word} = ТЕНЬ")
-    else:
-        print("  N4  ⚠ нет ffmpeg, только кадры")
-
-    # still of signs
-    Image.open(frames_dir / "f000.png").save(OUT / "artifact_4b.png")
-    # fragmented "QR" — 4 куска с частями слова КАДР as puzzle pieces
-    frag = Image.new("RGB", (900, 500), (245, 245, 245))
-    d = ImageDraw.Draw(frag)
-    d.text((24, 16), "Собери. Четыре обломка одной метки.", fill=(20, 20, 20), font=font(24))
-    pieces = [("КА", (40, 80)), ("Д", (360, 200)), ("Р", (620, 90)), ("·", (200, 300))]
-    # draw 4 irregular tiles that together read КАДР
-    tiles = [
-        (40, 80, 280, 260, "КА"),
-        (300, 80, 540, 260, ""),
-        (560, 80, 860, 260, "Д"),
-        (40, 280, 860, 460, "Р"),
-    ]
-    # better 2x2
-    tiles = [
-        (40, 80, 440, 270, "К"),
-        (460, 80, 860, 270, "А"),
-        (40, 290, 440, 470, "Д"),
-        (460, 290, 860, 470, "Р"),
-    ]
-    for x0, y0, x1, y1, ch in tiles:
-        d.rectangle((x0, y0, x1, y1), outline=(10, 10, 10), width=4, fill=(230, 230, 220))
-        # fake QR noise
-        rng = np.random.default_rng(abs(hash(ch)) % (2**32))
-        for _ in range(80):
-            px = int(rng.integers(x0 + 8, x1 - 12))
-            py = int(rng.integers(y0 + 8, y1 - 12))
-            d.rectangle((px, py, px + 8, py + 8), fill=(15, 15, 15))
-        d.text((x0 + 40, y0 + 50), ch, fill=(10, 10, 10), font=font(72))
-    hack_glitch(frag, seed=44).save(OUT / "artifact_4c.png")
-    print("  N4  shards → КАДР")
+    Ассеты собирает отдельный инструмент: bot/tools/make_n4_video.py
+    (исходник — сток в bot/quest/source/, вывод — artifact_4a/4b/4c).
+    """
+    print("  N4  пропущено: см. bot/tools/make_n4_video.py (YouTube CCTV + QR)")
 
 
 # ===================================================================== N5
