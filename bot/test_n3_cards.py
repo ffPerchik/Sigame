@@ -79,6 +79,15 @@ class N3CardStyleTests(unittest.TestCase):
         self.assertNotIn("vigenere(", n3)
         self.assertNotIn("ВИЖНЕР", n3)
 
+    def test_final_sheet_uses_all_three_previous_answers(self):
+        source = (REPO_ROOT / "bot" / "tools" / "make_quest_assets.py").read_text(encoding="utf-8")
+        n3 = source.split("def make_n3():", 1)[1].split("# ===================================================================== N4", 1)[0]
+        self.assertIn("РЕШЕТКА = 6×6 слов", n3)
+        self.assertIn("ПОЛИБИЙ = строка.столбец", n3)
+        self.assertIn("СТРОФА = материал", n3)
+        self.assertIn("assert all(len(line.split()) == 6 for line in stanza)", n3)
+        self.assertIn("первое — форма · второе — путь · третье — текст", n3)
+
     def test_reference_and_open_font_are_bundled(self):
         source_dir = REPO_ROOT / "bot" / "quest" / "source"
         parchments = [source_dir / name for name in (

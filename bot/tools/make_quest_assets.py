@@ -653,14 +653,17 @@ def make_n3():
         polybius_pairs.append(f"{index // 6 + 1}{index % 6 + 1}")
     assert len(polybius_alphabet) == 33
     assert polybius_pairs == ["43", "14", "11", "41", "45", "16"]
+    # Три предыдущих ответа становятся инструкцией к финалу:
+    # РЕШЕТКА = 6×6 слов, ПОЛИБИЙ = строка.столбец, СТРОФА = материал.
     stanza = [
-        "Серый иней трогает камни",        # 1.2 И
-        "В саду свет едва дышит",          # 2.3 С
-        "Под крышей тишина лежит",          # 3.3 Т
-        "Снова иней на ветках",             # 4.2 И
-        "В этой ночи открыт проход",        # 5.3 Н
-        "Храни архив как начало",           # 6.2 А
+        "Серый иней трогает старые камни тихо",       # 1.2 И
+        "В саду свет едва дышит ночью",               # 2.3 С
+        "Под крышей тишина лежит до рассвета",        # 3.3 Т
+        "Снова иней на ветках хранит следы",          # 4.2 И
+        "В этой ночи открыт старый проход",           # 5.3 Н
+        "Храни архив как начало нашей памяти",        # 6.2 А
     ]
+    assert all(len(line.split()) == 6 for line in stanza)
     picks = [(1, 2), (2, 3), (3, 3), (4, 2), (5, 3), (6, 2)]
     got = []
     for line_index, word_index in picks:
@@ -798,12 +801,22 @@ def make_n3():
     page4 = parchment_page(PARCHMENT_SOURCE_4)
     draw = ImageDraw.Draw(page4)
     centered_text(draw, "Лист IV", 95, script_font(82), ink)
-    centered_text(draw, "шесть строк из старого архива", 205, script_font(42), faded_ink)
+    centered_text(draw, "три прежних слова — одна инструкция", 205, script_font(42), faded_ink)
+    line_font = script_font(42)
+    number_font = script_font(40)
     for index, line in enumerate(stanza, start=1):
-        draw.text((145, 330 + (index - 1) * 125), f"{index}.  {line}", fill=ink, font=script_font(48))
+        y = 315 + (index - 1) * 125
+        draw.text((120, y), f"{index}.", fill=ink, font=number_font)
+        draw.text((190, y), line, fill=ink, font=line_font)
     coordinates = "   ".join(f"{line}.{word}" for line, word in picks)
-    centered_text(draw, coordinates, 1110, script_font(60), accent)
-    centered_text(draw, "две цифры — два шага", 1235, script_font(46), faded_ink)
+    centered_text(draw, coordinates, 1090, script_font(60), accent)
+    centered_text(
+        draw,
+        "первое — форма · второе — путь · третье — текст",
+        1225,
+        script_font(36),
+        faded_ink,
+    )
     page4.save(OUT / "artifact_3d.png", optimize=True)
 
     print(f"  N3  pigpen {word1}; crib {crib}")
