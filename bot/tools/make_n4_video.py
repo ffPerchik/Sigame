@@ -37,13 +37,14 @@ FONTS = BOT_DIR / "tools" / "fonts"
 
 W, H = 1920, 1080
 FPS = 25
-FLASH1_AT = 0.40           # доля ролика: первый глитч-кадр (d0 a8 d0)
-FLASH2_AT = 0.72           # второй глитч-кадр (a3 d0 9c)
+# Хронология строго последовательна: hex-сбои → буквенные сбои → ловушка → метка.
+FLASH1_AT = 0.27           # доля ролика: первый глитч-кадр (d0 a8 d0)
+FLASH2_AT = 0.43           # второй глитч-кадр (a3 d0 9c)
 FLASH_LEN = 12             # кадров (~0.5 c)
 LETTERS = "ВЗГЛЯД"
-LETTER_AT = [0.16, 0.27, 0.38, 0.48, 0.68, 0.79]   # доли ролика
-LETTER_LEN = 4             # кадров (~0.16 c)
-TRAP_AT, TRAP_LEN = 0.57, 35   # фальшивая метка (1.4 c)
+LETTER_AT = [0.50, 0.545, 0.59, 0.635, 0.68, 0.725]  # буквенные сбои, после hex
+LETTER_LEN = 3             # кадров (~0.12 c)
+TRAP_AT, TRAP_LEN = 0.76, 30   # фальшивая метка (~1.2 c)
 MARK_SECS = 4.0            # настоящая метка в конце
 QR_CODE = "CAM3EYE"
 TRAP_CODE = "CAM3TRAP"
@@ -117,12 +118,13 @@ def flash_frame(idx: int, hex_text: str) -> Image.Image:
     return img
 
 
-def letter_glow(img: Image.Image, letter: str) -> None:
-    """Одна полупрозрачная буква в правом нижнем углу (видна на паузе)."""
-    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    d = ImageDraw.Draw(glow)
-    d.text((W - 210, H - 210), letter, fill=(255, 60, 60, 110), font=mono(150))
-    img.paste(Image.alpha_composite(img.convert("RGBA"), glow).convert("RGB"), (0, 0))
+def letter_frame(idx: int, letter: str) -> Image.Image:
+    """Буквенный сбой: тот же тёмный глитч-стиль, но с крупной буквой."""
+    img = flash_frame(idx, "")
+    d = ImageDraw.Draw(img)
+    d.text(((W - mono(220).getlength(letter)) // 2, (H - 220) // 2 - 40), letter,
+           fill=(240, 240, 240), font=mono(220))
+    return img
 
 
 def poster(qr_img: Image.Image, header: str) -> Image.Image:
@@ -195,17 +197,19 @@ def main() -> None:
         mark_from = n - int(MARK_SECS * FPS)
 
         for i, fp in enumerate(frames):
+            letter_hit = next(
+                (k for k, start in enumerate(letter_i)
+                 if start <= i < start + LETTER_LEN), None)
             if f1 <= i < f1 + FLASH_LEN:
                 img = flash_frame(i, HEX1)
             elif f2 <= i < f2 + FLASH_LEN:
                 img = flash_frame(i, HEX2)
+            elif letter_hit is not None:
+                img = letter_frame(i, LETTERS[letter_hit])
             else:
                 img = Image.open(fp).convert("RGB")
                 img = ImageEnhance.Color(img).enhance(0.72)
                 hud(img, i)
-                for k, start in enumerate(letter_i):
-                    if start <= i < start + LETTER_LEN:
-                        letter_glow(img, LETTERS[k])
                 if trap_i <= i < trap_i + TRAP_LEN:
                     t = (i - trap_i) / FPS
                     dim(img, min(1.0, t / 0.3))
@@ -227,7 +231,7 @@ def main() -> None:
             IMAGES / "artifact_4c.png", optimize=True)
 
     print(f"  глитчи: @{f1} «{HEX1}» и @{f2} «{HEX2}» → ШУМ")
-    print(f"  буквы {LETTERS} на кадрах {letter_i}")
+    print(f"  буквы-сбои {LETTERS} на кадрах {letter_i}")
     print(f"  ловушка {TRAP_CODE} @{trap_i}; метка (зеркало) последние {MARK_SECS} c")
 
 
