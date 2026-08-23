@@ -44,6 +44,8 @@ class N3CardStyleTests(unittest.TestCase):
         self.assertIn("burn_lower_left_corner(page1)", n3)
         self.assertNotIn("А теперь — загадка", n3)
         self.assertIn("parchment_page()", n3)
+        self.assertIn("parchment_page(PARCHMENT_SOURCE_2)", n3)
+        self.assertIn("parchment_page(PARCHMENT_SOURCE_3)", n3)
         self.assertIn("script_font(", n3)
         self.assertNotIn("hack_glitch", n3)
         self.assertNotIn("образец АБВ", n3)
@@ -68,10 +70,19 @@ class N3CardStyleTests(unittest.TestCase):
         self.assertIn("assert rail_counts == [8, 14, 7]", n3)
 
     def test_reference_and_open_font_are_bundled(self):
-        parchment = REPO_ROOT / "bot" / "quest" / "source" / "n3_parchment.png"
+        source_dir = REPO_ROOT / "bot" / "quest" / "source"
+        parchments = [source_dir / name for name in (
+            "n3_parchment.png", "n3_parchment_2.png", "n3_parchment_3.png",
+        )]
+        for parchment in parchments:
+            raw = parchment.read_bytes()
+            self.assertGreater(len(raw), 100_000)
+            self.assertEqual(raw[:8], b"\x89PNG\r\n\x1a\n")
+            self.assertEqual(struct.unpack(">II", raw[16:24]), (848, 1264))
+        self.assertEqual(len({parchment.read_bytes() for parchment in parchments}), 3)
+
         script_font = REPO_ROOT / "bot" / "tools" / "fonts" / "MarckScript-Regular.ttf"
         license_file = REPO_ROOT / "bot" / "tools" / "fonts" / "OFL-MarckScript.txt"
-        self.assertGreater(parchment.stat().st_size, 100_000)
         self.assertGreater(script_font.stat().st_size, 50_000)
         self.assertIn("SIL OPEN FONT LICENSE", license_file.read_text(encoding="utf-8").upper())
 

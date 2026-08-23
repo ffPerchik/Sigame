@@ -27,6 +27,8 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 SCRIPT_FONT = BOT_ROOT / "tools" / "fonts" / "MarckScript-Regular.ttf"
 PARCHMENT_SOURCE = BOT_ROOT / "quest" / "source" / "n3_parchment.png"
+PARCHMENT_SOURCE_2 = BOT_ROOT / "quest" / "source" / "n3_parchment_2.png"
+PARCHMENT_SOURCE_3 = BOT_ROOT / "quest" / "source" / "n3_parchment_3.png"
 
 FONTS = [
     str(BOT_ROOT / "tools" / "fonts" / "DejaVuSans-Bold.ttf"),
@@ -58,11 +60,11 @@ def script_font(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(str(SCRIPT_FONT), size)
 
 
-def parchment_page() -> Image.Image:
-    """Чистый портретный лист на основе референса пользователя."""
-    if not PARCHMENT_SOURCE.exists():
-        raise FileNotFoundError(f"Нет фона старой бумаги: {PARCHMENT_SOURCE}")
-    return Image.open(PARCHMENT_SOURCE).convert("RGB").resize((1024, 1536), Image.Resampling.LANCZOS)
+def parchment_page(source: Path = PARCHMENT_SOURCE) -> Image.Image:
+    """Чистый портретный лист из выбранного фотографического пергамента."""
+    if not source.exists():
+        raise FileNotFoundError(f"Нет фона старой бумаги: {source}")
+    return Image.open(source).convert("RGB").resize((1024, 1536), Image.Resampling.LANCZOS)
 
 
 def centered_text(draw: ImageDraw.ImageDraw, text: str, y: int, text_font, fill):
@@ -714,7 +716,7 @@ def make_n3():
     page1.save(OUT / "artifact_3a.png", optimize=True)
 
     # Лист II: длинная фраза разложена по трём рельсам — взглядом ответ не угадать.
-    page2 = parchment_page()
+    page2 = parchment_page(PARCHMENT_SOURCE_2)
     draw = ImageDraw.Draw(page2)
     centered_text(draw, "Лист II", 105, script_font(82), ink)
     centered_text(draw, "строка помнит путь, которым её писали", 225, script_font(42), faded_ink)
@@ -733,7 +735,7 @@ def make_n3():
     page2.save(OUT / "artifact_3b.png", optimize=True)
 
     # Лист III: предыдущий ответ подсказывает способ, первый — повторяющееся слово.
-    page3 = parchment_page()
+    page3 = parchment_page(PARCHMENT_SOURCE_3)
     draw = ImageDraw.Draw(page3)
     centered_text(draw, "Лист III", 105, script_font(82), ink)
     centered_text(draw, "на полях: «первое слово всё ещё с тобой»", 245, script_font(40), faded_ink)
@@ -948,7 +950,7 @@ def write_readme():
 N2 использует связанную цепочку `n2_1.wav` → `n2_2.wav` → `n2_3.wav`;
 в последнем файле скрытая спектрограмма наложена на слышимый вальс.
 Файлы N3–N6 называются нейтрально (`artifact_*`), чтобы имя не выдавало метод решения.
-N3 собирается на фоне `quest/source/n3_parchment.png` шрифтом Marck Script (SIL OFL 1.1).
+Листы N3 используют три разных фона `quest/source/n3_parchment*.png`; листы II и III имеют собственные пергаменты. Шрифт — Marck Script (SIL OFL 1.1).
 """,
         encoding="utf-8",
     )
