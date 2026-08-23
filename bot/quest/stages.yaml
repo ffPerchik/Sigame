@@ -363,16 +363,10 @@ stages:
     next: N3_bookinfo
 
   N3_bookinfo:
-    mode: info
-    text: |
-      Последний лист. Внизу шесть пар чисел; выше ровно шесть строк.
-    image: artifact_3d.png
-    next: N3_book
-
-  N3_book:
     mode: auto
     text: |
-      Какое слово связало их вместе?
+      Последний лист.
+    image: artifact_3d.png
     accept:
       - "ИСТИНА"
       - "истина"
