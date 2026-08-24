@@ -31,7 +31,7 @@ function enter() {
 }
 
 function closeNode() {
-  if (lockCode() === '6535') {
+  if (lockCode() === '6355') {
     result.classList.remove('hidden');
   } else {
     result.classList.add('hidden');
