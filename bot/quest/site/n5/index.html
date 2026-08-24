@@ -3,72 +3,56 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ARGVS-1001 · N5 СЧЁТ</title>
+  <title>Северный учёт · архив заявок</title>
   <link rel="stylesheet" href="style.css">
+  <!-- audit: индексацию служебных маршрутов см. в /robots.txt -->
 </head>
 <body>
-  <!-- HEX UTF-8: d0bb d0be d0ba -->
-  <div class="noise"></div>
-  <main class="shell">
-    <header class="topbar">
-      <div>
-        <p class="kicker">ARGVS-1001 / NODE N5</p>
-        <h1>СЧЁТ: сбойный расчётный узел</h1>
-      </div>
-      <div class="status" id="status">LOCKED</div>
-    </header>
+  <header class="site-header">
+    <a class="brand" href="/">Северный учёт</a>
+    <nav>
+      <a href="#services">Услуги</a>
+      <a href="#archive">Архив</a>
+      <a href="#contacts">Контакты</a>
+    </nav>
+  </header>
 
-    <section class="brief">
-      <p>Система не хранит ответы открыто. Она хранит порядок, адреса и следы вычислений.</p>
-      <p>После каждого найденного слова введи его в Telegram-бот. Здесь можно проверять ход.</p>
+  <main>
+    <section class="hero">
+      <p class="eyebrow">Инвентаризация · сверка · хранение</p>
+      <h1>Электронный архив актов и складских ведомостей</h1>
+      <p>Мы переносим бумажные журналы в аккуратные реестры, проверяем нумерацию и восстанавливаем порядок записей после сбоев.</p>
+      <a class="button" href="#archive">Посмотреть публичные записи</a>
     </section>
 
-    <section class="grid">
-      <article class="panel active" data-step="0">
-        <h2>I · Регистр</h2>
-        <p class="muted">Шесть бит — один номер буквы. А = 000001.</p>
-        <pre class="bits">001101 001111 000101 010100 001100 011101</pre>
-        <label>Что лежит в регистре?</label>
-        <div class="answer"><input id="a0" autocomplete="off"><button data-check="0">Проверить</button></div>
-      </article>
-
-      <article class="panel locked" data-step="1">
-        <h2>II · Матрица</h2>
-        <p class="muted">Внешний вид шумит. Числа задают порядок обхода.</p>
-        <div class="matrix" aria-label="matrix">
-          <div><b>8</b><span>X</span></div><div><b>1</b><span>Ч</span></div><div><b>6</b><span>X</span></div>
-          <div><b>3</b><span>С</span></div><div><b>5</b><span>О</span></div><div><b>7</b><span>X</span></div>
-          <div><b>4</b><span>Л</span></div><div><b>9</b><span>X</span></div><div><b>2</b><span>И</span></div>
-        </div>
-        <p class="muted">Мусор не является частью слова.</p>
-        <label>Что говорит матрица?</label>
-        <div class="answer"><input id="a1" autocomplete="off"><button data-check="1">Проверить</button></div>
-      </article>
-
-      <article class="panel locked" data-step="2">
-        <h2>III · Видимая страница</h2>
-        <p>Если смотришь глазами — смотришь не туда.</p>
-        <p class="muted">Иногда данные остаются не в рендере, а рядом с ним.</p>
-        <label>Что осталось за видимой страницей?</label>
-        <div class="answer"><input id="a2" autocomplete="off"><button data-check="2">Проверить</button></div>
-      </article>
-
-      <article class="panel locked" data-step="3">
-        <h2>IV · Замок</h2>
-        <p class="muted">Ряд уже встречался в другом узле. Начало здесь бесполезно.</p>
-        <pre class="bits">1  1  2  3  5  8  13  21</pre>
-        <p class="muted">Нужны четыре после единиц.</p>
-        <label>Код закрытия узла</label>
-        <div class="answer"><input id="a3" inputmode="numeric" autocomplete="off"><button data-check="3">Проверить</button></div>
-      </article>
+    <section id="services" class="cards">
+      <article><h2>Сверка модулей</h2><p>Разбиваем крупные ведомости на короткие блоки и проверяем каждый блок отдельно.</p></article>
+      <article><h2>Порядок обхода</h2><p>Если таблица повреждена, восстановление идёт по служебным индексам, а не по внешнему виду.</p></article>
+      <article><h2>Архивные копии</h2><p>Оставляем технические пометки для аудитора, но не показываем их в публичном интерфейсе.</p></article>
     </section>
 
-    <section class="console">
-      <div class="console-head">diagnostic log</div>
-      <pre id="log">[00:00:00] NODE N5 WAITING FOR INPUT</pre>
+    <section id="archive" class="archive">
+      <div><p class="eyebrow">Публичный статус</p><h2>Последние обработки</h2></div>
+      <table>
+        <thead><tr><th>№</th><th>Объект</th><th>Статус</th><th>Примечание</th></tr></thead>
+        <tbody>
+          <tr><td>042</td><td>Складская книга</td><td>готово</td><td>без замечаний</td></tr>
+          <tr><td>113</td><td>Опись оборудования</td><td>готово</td><td>индексы восстановлены</td></tr>
+          <tr><td>205</td><td>Расчётный лист</td><td>закрыто</td><td>доступ только оператору</td></tr>
+        </tbody>
+      </table>
+      <!-- operator=argus; пароль собирается из трёх контрольных слов: регистр → матрица → исходник -->
+      <!-- register: 001101 001111 000101 010100 001100 011101; alphabet: А=000001, без Ё -->
+      <!-- HEX UTF-8: d0bb d0be d0ba -->
+    </section>
+
+    <section id="contacts" class="contacts">
+      <h2>Контакты</h2>
+      <p>support@north-ledger.example</p>
+      <p class="small">Публичная версия сайта не содержит персональных данных.</p>
     </section>
   </main>
 
-  <script src="app.js"></script>
+  <footer><span>© Северный учёт, 2026</span><span>Версия интерфейса 5.3.8</span></footer>
 </body>
 </html>

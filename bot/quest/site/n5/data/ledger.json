@@ -1,0 +1,13 @@
+{
+  "notice": "service copy; public rendering disabled",
+  "operator": "argus",
+  "matrix_rule": "read by cell number from 1 to 9; X is noise",
+  "matrix": [
+    [{"n": 8, "v": "X"}, {"n": 1, "v": "Ч"}, {"n": 6, "v": "X"}],
+    [{"n": 3, "v": "С"}, {"n": 5, "v": "О"}, {"n": 7, "v": "X"}],
+    [{"n": 4, "v": "Л"}, {"n": 9, "v": "X"}, {"n": 2, "v": "И"}]
+  ],
+  "password_format": "WORD1-WORD2-WORD3",
+  "lock_series": "1 1 2 3 5 8 13 21",
+  "lock_rule": "four after the ones"
+}

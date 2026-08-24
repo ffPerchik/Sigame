@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Северный учёт · оператор</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="admin-page">
+  <main class="admin-shell">
+    <section class="login-card" id="login-card">
+      <p class="eyebrow">Служебный вход</p>
+      <h1>Панель оператора</h1>
+      <p class="muted">Доступ разрешён только сотрудникам архива.</p>
+      <label>Оператор</label>
+      <input id="login" autocomplete="off" placeholder="operator">
+      <label>Пароль</label>
+      <input id="password" autocomplete="off" placeholder="WORD1-WORD2-WORD3">
+      <button id="enter">Войти</button>
+      <p class="error" id="error"></p>
+    </section>
+
+    <section class="dashboard hidden" id="dashboard">
+      <p class="eyebrow">operator: argus</p>
+      <h1>Расчётный лист №205</h1>
+      <div class="terminal">
+        <p>auth: accepted</p>
+        <p>module: restored</p>
+        <p>matrix: restored</p>
+        <p>source lock: restored</p>
+        <p>series: <strong>1 1 2 3 5 8 13 21</strong></p>
+      </div>
+      <p class="muted">Чтобы закрыть узел, выполни последнее правило из реестра: четыре после единиц.</p>
+      <label>Код замка</label>
+      <input id="lock" inputmode="numeric" autocomplete="off">
+      <button id="close-node">Закрыть расчёт</button>
+      <div class="result hidden" id="result">
+        <h2>Расчёт закрыт</h2>
+        <p>Код для Telegram-бота:</p>
+        <pre>2358</pre>
+      </div>
+    </section>
+  </main>
+  <script src="admin.js"></script>
+</body>
+</html>
