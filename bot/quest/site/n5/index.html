@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ARGVS-1001 · N5 СЧЁТ</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- HEX UTF-8: d0bb d0be d0ba -->
+  <div class="noise"></div>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="kicker">ARGVS-1001 / NODE N5</p>
+        <h1>СЧЁТ: сбойный расчётный узел</h1>
+      </div>
+      <div class="status" id="status">LOCKED</div>
+    </header>
+
+    <section class="brief">
+      <p>Система не хранит ответы открыто. Она хранит порядок, адреса и следы вычислений.</p>
+      <p>После каждого найденного слова введи его в Telegram-бот. Здесь можно проверять ход.</p>
+    </section>
+
+    <section class="grid">
+      <article class="panel active" data-step="0">
+        <h2>I · Регистр</h2>
+        <p class="muted">Шесть бит — один номер буквы. А = 000001.</p>
+        <pre class="bits">001101 001111 000101 010100 001100 011101</pre>
+        <label>Что лежит в регистре?</label>
+        <div class="answer"><input id="a0" autocomplete="off"><button data-check="0">Проверить</button></div>
+      </article>
+
+      <article class="panel locked" data-step="1">
+        <h2>II · Матрица</h2>
+        <p class="muted">Внешний вид шумит. Числа задают порядок обхода.</p>
+        <div class="matrix" aria-label="matrix">
+          <div><b>8</b><span>X</span></div><div><b>1</b><span>Ч</span></div><div><b>6</b><span>X</span></div>
+          <div><b>3</b><span>С</span></div><div><b>5</b><span>О</span></div><div><b>7</b><span>X</span></div>
+          <div><b>4</b><span>Л</span></div><div><b>9</b><span>X</span></div><div><b>2</b><span>И</span></div>
+        </div>
+        <p class="muted">Мусор не является частью слова.</p>
+        <label>Что говорит матрица?</label>
+        <div class="answer"><input id="a1" autocomplete="off"><button data-check="1">Проверить</button></div>
+      </article>
+
+      <article class="panel locked" data-step="2">
+        <h2>III · Видимая страница</h2>
+        <p>Если смотришь глазами — смотришь не туда.</p>
+        <p class="muted">Иногда данные остаются не в рендере, а рядом с ним.</p>
+        <label>Что осталось за видимой страницей?</label>
+        <div class="answer"><input id="a2" autocomplete="off"><button data-check="2">Проверить</button></div>
+      </article>
+
+      <article class="panel locked" data-step="3">
+        <h2>IV · Замок</h2>
+        <p class="muted">Ряд уже встречался в другом узле. Начало здесь бесполезно.</p>
+        <pre class="bits">1  1  2  3  5  8  13  21</pre>
+        <p class="muted">Нужны четыре после единиц.</p>
+        <label>Код закрытия узла</label>
+        <div class="answer"><input id="a3" inputmode="numeric" autocomplete="off"><button data-check="3">Проверить</button></div>
+      </article>
+    </section>
+
+    <section class="console">
+      <div class="console-head">diagnostic log</div>
+      <pre id="log">[00:00:00] NODE N5 WAITING FOR INPUT</pre>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
