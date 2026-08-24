@@ -23,23 +23,36 @@
     <section class="dashboard hidden" id="dashboard">
       <p class="eyebrow">operator: argus</p>
       <h1>Расчётный лист №205</h1>
-      <div class="terminal">
+      <div class="terminal key-board">
         <p>auth: accepted</p>
-        <p>module: restored — <strong>МОДУЛЬ</strong></p>
-        <p>matrix: restored — <strong>ЧИСЛО</strong></p>
-        <p>source lock: restored — <strong>ЛОК</strong></p>
-        <p>operator: verified — <strong>ARGUS</strong></p>
-        <p>closure route: <strong>восстанови из следа процесса с архивной поправкой</strong></p>
-        <p>closure rule: <strong>в маршрут идут только габариты ключей</strong></p>
+        <div class="key-row">
+          <span>РЕГИСТР</span><strong>МОДУЛЬ</strong>
+        </div>
+        <div class="key-row">
+          <span>РЕЕСТР</span><strong>ЧИСЛО</strong>
+        </div>
+        <div class="key-row">
+          <span>ИСТОЧНИК</span><strong>ЛОК</strong>
+        </div>
+        <div class="key-row">
+          <span>ОПЕРАТОР</span><strong>ARGUS</strong>
+        </div>
       </div>
-      <p class="muted">Четыре ключа восстановлены, но порядок закрытия вынесен в след процесса и требует архивной поправки. Замок не принимает сами слова — ему нужны только их габариты.</p>
-      <label>Код замка</label>
-      <input id="lock" inputmode="numeric" autocomplete="off">
-      <button id="close-node">Закрыть расчёт</button>
+      <p class="muted">Слова уже приняли верные позиции, вот только на панели кодовый замок.</p>
+      <div class="lock-panel" data-rule="код принимает длины слов">
+        <label>Кодовый замок</label>
+        <div class="digit-lock" aria-label="Кодовый замок">
+          <input class="digit" inputmode="numeric" maxlength="1" autocomplete="off">
+          <input class="digit" inputmode="numeric" maxlength="1" autocomplete="off">
+          <input class="digit" inputmode="numeric" maxlength="1" autocomplete="off">
+          <input class="digit" inputmode="numeric" maxlength="1" autocomplete="off">
+        </div>
+        <button id="close-node">Закрыть расчёт</button>
+      </div>
       <div class="result hidden" id="result">
         <h2>Расчёт закрыт</h2>
         <p>Код для Telegram-бота:</p>
-        <pre>5365</pre>
+        <pre>6535</pre>
       </div>
     </section>
   </main>

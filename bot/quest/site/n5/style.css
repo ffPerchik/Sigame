@@ -37,3 +37,11 @@ label { display:block; margin:18px 0 8px; font-weight:700; } input { width:100%;
 .machine-card { margin:34px 0 56px; padding:16px 18px; border:1px dashed var(--line); border-radius:14px; background:#fbfaf6; color:var(--muted); font-family:Consolas, 'Courier New', monospace; font-size:13px; }
 .machine-card dt { float:left; clear:left; width:92px; color:var(--accent-dark); font-weight:700; }
 .machine-card dd { margin:6px 0 6px 106px; overflow-wrap:anywhere; }
+.key-board { display:grid; gap:10px; }
+.key-row { display:grid; grid-template-columns:120px 1fr; gap:12px; align-items:center; }
+.key-row span { color:#98a2b3; }
+.key-row strong { color:#d1fadf; letter-spacing:.08em; }
+.lock-panel { margin-top:18px; padding:18px; border:1px solid var(--line); border-radius:16px; background:#fbfaf6; }
+.digit-lock { display:grid; grid-template-columns:repeat(4, minmax(48px, 72px)); gap:12px; margin:10px 0 16px; }
+.digit { height:72px; text-align:center; font-size:36px; font-weight:800; font-family:Consolas, 'Courier New', monospace; }
+@media (max-width:460px) { .digit-lock { grid-template-columns:repeat(4, 1fr); } .digit { height:58px; font-size:28px; } .key-row { grid-template-columns:1fr; gap:2px; } }
