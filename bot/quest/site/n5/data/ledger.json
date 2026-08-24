@@ -1,13 +1,15 @@
 {
   "notice": "service copy; public rendering disabled",
   "operator": "argus",
-  "matrix_rule": "read by cell number from 1 to 9; X is noise",
+  "matrix_rule": "take Fibonacci numbers after the two starting ones; reduce addresses by module 9; 0 means 9; read five letters; X is noise",
+  "sequence": "1 1 2 3 5 8 13 21 34",
+  "module": 9,
+  "addresses_after_module": "2 3 5 8 4 ...",
   "matrix": [
-    [{"n": 8, "v": "X"}, {"n": 1, "v": "Ч"}, {"n": 6, "v": "X"}],
-    [{"n": 3, "v": "С"}, {"n": 5, "v": "О"}, {"n": 7, "v": "X"}],
-    [{"n": 4, "v": "Л"}, {"n": 9, "v": "X"}, {"n": 2, "v": "И"}]
+    [{"n": 1, "v": "X"}, {"n": 2, "v": "Ч"}, {"n": 3, "v": "И"}],
+    [{"n": 4, "v": "О"}, {"n": 5, "v": "С"}, {"n": 6, "v": "X"}],
+    [{"n": 7, "v": "X"}, {"n": 8, "v": "Л"}, {"n": 9, "v": "X"}]
   ],
   "password_format": "WORD1-WORD2-WORD3",
-  "lock_series": "1 1 2 3 5 8 13 21",
-  "lock_rule": "four after the ones"
+  "lock_rule": "the lock uses the first four Fibonacci addresses after the starting ones, before the first modular wrap"
 }
