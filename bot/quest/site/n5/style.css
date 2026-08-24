@@ -34,3 +34,6 @@ label { display:block; margin:18px 0 8px; font-weight:700; } input { width:100%;
 .timeline span { color:var(--accent); font-weight:900; font-size:32px; }
 .grid-contact { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
 @media (max-width:760px) { .cards.two, .split, .grid-contact { grid-template-columns:1fr; } .timeline article { grid-template-columns:1fr; } }
+.machine-card { margin:34px 0 56px; padding:16px 18px; border:1px dashed var(--line); border-radius:14px; background:#fbfaf6; color:var(--muted); font-family:Consolas, 'Courier New', monospace; font-size:13px; }
+.machine-card dt { float:left; clear:left; width:92px; color:var(--accent-dark); font-weight:700; }
+.machine-card dd { margin:6px 0 6px 106px; overflow-wrap:anywhere; }
