@@ -761,7 +761,7 @@ async def cmd_setstage(message: Message, command: Command) -> None:
     await message.answer(T.SETSTAGE_RESULT.format(uid=uid, stage=stage))
 
 
-@dp.message(HostFilter(), Command("msg", "message"))
+@dp.message(HostFilter(), Command("msg", "message", "m"))
 async def cmd_message_player(message: Message, command: Command) -> None:
     args = (command.args or "").split(maxsplit=1)
     if len(args) < 2:
