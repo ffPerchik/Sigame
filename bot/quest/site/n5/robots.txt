@@ -2,4 +2,4 @@ User-agent: *
 Disallow: /admin.html
 Disallow: /data/ledger.json
 
-# audit note: матрица обхода лежит в закрытом реестре
+# audit note: закрытый реестр хранит не страницу, а адресную матрицу

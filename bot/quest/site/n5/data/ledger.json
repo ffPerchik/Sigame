@@ -1,15 +1,222 @@
 {
   "notice": "service copy; public rendering disabled",
   "operator": "argus",
-  "matrix_rule": "take Fibonacci numbers after the two starting ones; reduce addresses by module 9; 0 means 9; read five letters; X is noise",
-  "sequence": "1 1 2 3 5 8 13 21 34",
-  "module": 9,
-  "addresses_after_module": "2 3 5 8 4 ...",
+  "matrix_rule": "take Fibonacci numbers after the two starting ones; reduce addresses by module 49; 0 means 49; read five letters",
+  "sequence": "1 1 2 3 5 8 13 21 34 55 89",
+  "module": 49,
+  "addresses_after_module": "2 3 5 8 13 21 34 6 40 ...",
   "matrix": [
-    [{"n": 1, "v": "X"}, {"n": 2, "v": "Ч"}, {"n": 3, "v": "И"}],
-    [{"n": 4, "v": "О"}, {"n": 5, "v": "С"}, {"n": 6, "v": "X"}],
-    [{"n": 7, "v": "X"}, {"n": 8, "v": "Л"}, {"n": 9, "v": "X"}]
+    [
+      {
+        "n": 1,
+        "v": "Щ"
+      },
+      {
+        "n": 2,
+        "v": "Ч"
+      },
+      {
+        "n": 3,
+        "v": "И"
+      },
+      {
+        "n": 4,
+        "v": "Ш"
+      },
+      {
+        "n": 5,
+        "v": "С"
+      },
+      {
+        "n": 6,
+        "v": "Ж"
+      },
+      {
+        "n": 7,
+        "v": "Ь"
+      }
+    ],
+    [
+      {
+        "n": 8,
+        "v": "Л"
+      },
+      {
+        "n": 9,
+        "v": "В"
+      },
+      {
+        "n": 10,
+        "v": "С"
+      },
+      {
+        "n": 11,
+        "v": "Э"
+      },
+      {
+        "n": 12,
+        "v": "М"
+      },
+      {
+        "n": 13,
+        "v": "О"
+      },
+      {
+        "n": 14,
+        "v": "Е"
+      }
+    ],
+    [
+      {
+        "n": 15,
+        "v": "Н"
+      },
+      {
+        "n": 16,
+        "v": "Ч"
+      },
+      {
+        "n": 17,
+        "v": "Л"
+      },
+      {
+        "n": 18,
+        "v": "Т"
+      },
+      {
+        "n": 19,
+        "v": "Ф"
+      },
+      {
+        "n": 20,
+        "v": "Ш"
+      },
+      {
+        "n": 21,
+        "v": "М"
+      }
+    ],
+    [
+      {
+        "n": 22,
+        "v": "Ш"
+      },
+      {
+        "n": 23,
+        "v": "Т"
+      },
+      {
+        "n": 24,
+        "v": "Ж"
+      },
+      {
+        "n": 25,
+        "v": "У"
+      },
+      {
+        "n": 26,
+        "v": "Э"
+      },
+      {
+        "n": 27,
+        "v": "Б"
+      },
+      {
+        "n": 28,
+        "v": "А"
+      }
+    ],
+    [
+      {
+        "n": 29,
+        "v": "Ч"
+      },
+      {
+        "n": 30,
+        "v": "Я"
+      },
+      {
+        "n": 31,
+        "v": "Ц"
+      },
+      {
+        "n": 32,
+        "v": "Ч"
+      },
+      {
+        "n": 33,
+        "v": "Ю"
+      },
+      {
+        "n": 34,
+        "v": "П"
+      },
+      {
+        "n": 35,
+        "v": "Ц"
+      }
+    ],
+    [
+      {
+        "n": 36,
+        "v": "Ц"
+      },
+      {
+        "n": 37,
+        "v": "Ф"
+      },
+      {
+        "n": 38,
+        "v": "У"
+      },
+      {
+        "n": 39,
+        "v": "Ч"
+      },
+      {
+        "n": 40,
+        "v": "Ю"
+      },
+      {
+        "n": 41,
+        "v": "Ж"
+      },
+      {
+        "n": 42,
+        "v": "Ю"
+      }
+    ],
+    [
+      {
+        "n": 43,
+        "v": "Р"
+      },
+      {
+        "n": 44,
+        "v": "Ч"
+      },
+      {
+        "n": 45,
+        "v": "Э"
+      },
+      {
+        "n": 46,
+        "v": "У"
+      },
+      {
+        "n": 47,
+        "v": "Ю"
+      },
+      {
+        "n": 48,
+        "v": "Д"
+      },
+      {
+        "n": 49,
+        "v": "А"
+      }
+    ]
   ],
   "password_format": "WORD1-WORD2-WORD3",
-  "lock_rule": "the lock uses the first four Fibonacci addresses after the starting ones, before the first modular wrap"
+  "lock_rule": "the lock uses the first four Fibonacci addresses after the starting ones, before any modular wrap"
 }
