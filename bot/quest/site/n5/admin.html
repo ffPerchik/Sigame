@@ -25,22 +25,21 @@
       <h1>Расчётный лист №205</h1>
       <div class="terminal">
         <p>auth: accepted</p>
-        <p>register word: <strong>МОДУЛЬ</strong></p>
-        <p>registry word: <strong>ЧИСЛО</strong></p>
-        <p>source word: <strong>ЛОК</strong></p>
-        <p>operator word: <strong>ARGUS</strong></p>
-        <p>checksum alphabet: <strong>А=1 … Я=32, без Ё; A=1 … Z=26</strong></p>
-        <p>closure rule: <strong>sum letters in each word, then reduce each sum to one digit</strong></p>
-        <p>order: <strong>register / registry / source / operator</strong></p>
+        <p>module: restored</p>
+        <p>matrix: restored</p>
+        <p>source lock: restored</p>
+        <p>series: <strong>1 1 2 3 5 8 13 21 34 55 89</strong></p>
+        <p>module: <strong>49</strong></p>
+        <p>addresses: <strong>2 3 5 8 13 21 34 6 40 ...</strong></p>
       </div>
-      <p class="muted">Чтобы закрыть узел, рассчитай четыре контрольные цифры по словам, которые уже открыли панель.</p>
-      <label>Контрольный код</label>
+      <p class="muted">Чтобы закрыть узел, выполни последнее правило из реестра: первые четыре адреса Фибоначчи после стартовых единиц, до любого модульного переноса.</p>
+      <label>Код замка</label>
       <input id="lock" inputmode="numeric" autocomplete="off">
       <button id="close-node">Закрыть расчёт</button>
       <div class="result hidden" id="result">
         <h2>Расчёт закрыт</h2>
         <p>Код для Telegram-бота:</p>
-        <pre>4623</pre>
+        <pre>2358</pre>
       </div>
     </section>
   </main>

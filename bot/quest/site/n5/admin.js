@@ -27,7 +27,7 @@ function enter() {
 }
 
 function closeNode() {
-  if (normalize(lock.value) === '4623') {
+  if (normalize(lock.value) === '2358') {
     result.classList.remove('hidden');
   } else {
     result.classList.add('hidden');
