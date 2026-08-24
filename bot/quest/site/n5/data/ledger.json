@@ -218,5 +218,5 @@
     ]
   ],
   "password_format": "WORD1-WORD2-WORD3",
-  "lock_rule": "the lock uses the first four Fibonacci addresses after the starting ones, before any modular wrap"
+  "lock_rule": "operator panel closes by lengths of restored keys in recovery order"
 }
