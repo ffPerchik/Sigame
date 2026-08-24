@@ -218,5 +218,5 @@
     ]
   ],
   "password_format": "WORD1-WORD2-WORD3",
-  "lock_rule": "operator panel closes by lengths of restored keys in recovery order"
+  "lock_rule": "operator panel closes by key sizes in the route hidden in process trace"
 }
