@@ -641,7 +641,7 @@ def make_n2():
 
 # ===================================================================== N3
 def make_n3():
-    """Четыре реалистичных листа: pigpen → rail → Polybius → book cipher."""
+    """Четыре реалистичных листа: pigpen → rail → Polybius → pigpen-решётка."""
     word1 = "РЕШЕТКА"
     crib = "СИКССЕВЕН"
     # Рельсы называют новый метод, не повторяя Виженера из N2.
@@ -665,24 +665,23 @@ def make_n3():
         polybius_pairs.append(f"{index // 6 + 1}{index % 6 + 1}")
     assert len(polybius_alphabet) == 33
     assert polybius_pairs == ["43", "14", "11", "41", "45", "16"]
-    # Три предыдущих ответа становятся одной механикой финала:
-    # РЕШЕТКА = 6×6 слов, ПОЛИБИЙ = строка.столбец, СТРОФА = материал.
-    # Координаты, которыми на листе III было записано СТРОФА, используются повторно.
-    stanza = [
-        "Тихий ветер гасит свет пряча архив",              # 1.1 Т, 1.4 С, 1.6 А
-        "Старые стены помнят шаги давних гостей",
-        "Под крышей дремлет пыль немого времени",
-        "Иней снова ищет след ночной памяти",             # 4.1 И, 4.3 И, 4.5 Н
-        "Луна тихо гладит старую пустую страницу",
-        "К рассвету рукопись опять станет тише",
-    ]
-    assert all(len(line.split()) == 6 for line in stanza)
+    # Финал: язык листа I в клетках, первое слово подписывает столбцы,
+    # пары листа III выбирают знаки. Pigpen этих клеток → ИСТИНА.
+    unique_key = "".join(dict.fromkeys(word1))
+    assert unique_key == "РЕШТКА"
+    answer4 = "ИСТИНА"
     picks = [(int(pair[0]), int(pair[1])) for pair in polybius_pairs]
-    got = []
-    for line_index, word_index in picks:
-        word = stanza[line_index - 1].split()[word_index - 1]
-        got.append(only_ru(word)[0])
-    assert "".join(got) == "ИСТИНА", got
+    assert len(picks) == len(answer4) == 6
+    grid_letters = [[""] * 6 for _ in range(6)]
+    for (row, column), letter in zip(picks, answer4):
+        grid_letters[row - 1][column - 1] = letter
+    noise = [ch for ch in RU if ch not in answer4]
+    for row in range(6):
+        for column in range(6):
+            if not grid_letters[row][column]:
+                grid_letters[row][column] = noise[(row * 7 + column * 3) % len(noise)]
+    got = [grid_letters[row - 1][column - 1] for row, column in picks]
+    assert "".join(got) == answer4, got
 
     ink = (62, 39, 23)
     faded_ink = (92, 62, 39)
@@ -810,31 +809,58 @@ def make_n3():
     centered_text(draw, "  ".join(polybius_pairs), 1035, script_font(82), accent)
     page3.save(OUT / "artifact_3c.png", optimize=True)
 
-    # Лист IV: книжные координаты остаются частью самого рукописного листа.
+    # Лист IV: решётка на языке листа I. Столбцы — уникальные буквы РЕШЕТКА.
     page4 = parchment_page(PARCHMENT_SOURCE_4)
     draw = ImageDraw.Draw(page4)
-    centered_text(draw, "Лист IV", 95, script_font(82), ink)
-    centered_text(draw, "три прежних слова — одна инструкция", 205, script_font(42), faded_ink)
-    line_font = script_font(36)
-    number_font = script_font(36)
-    for index, line in enumerate(stanza, start=1):
-        y = 315 + (index - 1) * 125
-        draw.text((120, y), f"{index}.", fill=ink, font=number_font)
-        draw.text((190, y), line, fill=ink, font=line_font)
-    coordinates = "   ".join(f"{line}.{word}" for line, word in picks)
-    centered_text(
-        draw,
-        "шесть пар с прошлого листа ещё не закончили путь",
-        1165,
-        script_font(38),
-        faded_ink,
-    )
+    centered_text(draw, "Лист IV", 70, script_font(82), ink)
+    centered_text(draw, "три прежних слова — одна инструкция", 170, script_font(40), faded_ink)
+    centered_text(draw, "столбцы помнят первое слово", 230, script_font(38), faded_ink)
+
+    grid_x, grid_y, cell = 245, 360, 85
+    grid_size = cell * 6
+    label_font = script_font(32)
+    for index in range(7):
+        offset = index * cell
+        draw.line((grid_x + offset, grid_y, grid_x + offset, grid_y + grid_size), fill=ink, width=3)
+        draw.line((grid_x, grid_y + offset, grid_x + grid_size, grid_y + offset), fill=ink, width=3)
+    header_scale = 13
+    cell_scale = 18
+    for index, letter in enumerate(unique_key):
+        draw_pigpen(
+            draw,
+            (
+                int(grid_x + index * cell + cell / 2 - header_scale),
+                grid_y - 62,
+            ),
+            letter,
+            scale=header_scale,
+            color=ink,
+            width=4,
+        )
+        draw.text(
+            (grid_x - 32, grid_y + index * cell + cell / 2),
+            str(index + 1), fill=faded_ink, font=label_font, anchor="mm",
+        )
+    for row in range(6):
+        for column in range(6):
+            draw_pigpen(
+                draw,
+                (
+                    int(grid_x + column * cell + cell / 2 - cell_scale),
+                    int(grid_y + row * cell + cell / 2 - cell_scale),
+                ),
+                grid_letters[row][column],
+                scale=cell_scale,
+                color=ink,
+                width=5,
+            )
+    centered_text(draw, "язык первого листа ещё нужен", 1185, script_font(40), faded_ink)
     page4.save(OUT / "artifact_3d.png", optimize=True)
 
     print(f"  N3  pigpen {word1}; crib {crib}")
     print(f"  N3  rail {rail_plain} → {rail_c}")
     print(f"  N3  polybius key={word1} {polybius_plain} → {' '.join(polybius_pairs)}")
-    print(f"  N3  book {coordinates} → {''.join(got)}")
+    print(f"  N3  pigpen-grid cols={unique_key} {picks} → {''.join(got)}")
 
 
 # ===================================================================== N4
