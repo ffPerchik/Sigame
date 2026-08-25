@@ -165,3 +165,36 @@ def qr_stages() -> dict:
             codes = st["accept"] if isinstance(st["accept"], list) else [st["accept"]]
             out[sid] = codes[0]
     return out
+
+
+def trap_stages() -> dict:
+    """code -> (stage_id, trap_text) для всех ловушек (trap_accept)."""
+    out = {}
+    for sid, st in load().get("stages", {}).items():
+        traps = st.get("trap_accept") or []
+        if isinstance(traps, str):
+            traps = [traps]
+        for code in traps:
+            out.setdefault(_norm(code), (sid, st.get("trap_text") or ""))
+    return out
+
+
+def lookup_trap(answer: str) -> Optional[tuple]:
+    """(stage_id, trap_text), если ответ — код ловушки, иначе None.
+
+    Ловушки глобальные: срабатывают на любом стейдже и ничего не меняют.
+    """
+    hit = trap_stages().get(_norm(answer))
+    return hit if hit is not None else None
+
+
+def qr_traps() -> dict:
+    """stage_id -> код ловушки (первый trap_accept), для make_qr.py."""
+    out = {}
+    for sid, st in load().get("stages", {}).items():
+        traps = st.get("trap_accept") or []
+        if isinstance(traps, str):
+            traps = [traps]
+        if traps:
+            out[sid] = traps[0]
+    return out

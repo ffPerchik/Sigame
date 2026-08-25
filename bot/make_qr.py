@@ -44,7 +44,16 @@ for stage_id, code in quest.qr_stages().items():
     print(f"  {stage_id}.png  ←  {url}")
     n += 1
 
+# Ловушки: QR с кодами-обманками (trap_accept). Скан в любой момент —
+# бот отвечает издёвкой и не меняет прогресс.
+for stage_id, code in quest.qr_traps().items():
+    url = base + str(code)
+    img = qrcode.make(url)
+    img.save(OUT / f"{stage_id}_trap.png")
+    print(f"  {stage_id}_trap.png  ←  {url} (ловушка)")
+    n += 1
+
 if n == 0:
     print("qr-стадий в stages.yaml нет (нужно qr: true и accept: [код]).")
 else:
-    print(f"\nГотово: {n} QR в {OUT}. Распечатай и спрячь на локациях.")
+    print(f"\nГотово: {n} QR в {OUT}. Настоящие — распечатай и спрячь на локациях, ловушки — для видео/приманок.")
