@@ -913,7 +913,7 @@ def make_n4():
 
 # ===================================================================== N5
 def make_n5():
-    """binary МОДУЛЬ + magic square ЧИСЛО + html comment HEX + lock 2-5-8-4."""
+    """binary МОДУЛЬ + magic square ЧИСЛО + html comment HEX + lock 2358."""
     word_bin = "МОДУЛЬ"
     bits = " ".join(f"{RU.index(ch) + 1:06b}" for ch in word_bin)
 
@@ -961,11 +961,11 @@ def make_n5():
 """
     # ЛОК = d0bb d0be d0ba
     (OUT / "artifact_5b.html").write_text(html, encoding="utf-8")
-    lock = "2584"  # fib
+    lock = "2358"  # четыре числа после двух единиц в ряду Фибоначчи
     print(f"  N5  binary → {word_bin}")
     print(f"  N5  square → {word_sq}")
     print(f"  N5  html comment HEX → ЛОК")
-    print(f"  N5  lock (fib 2,5,8,13 truncated 4) shown in verse? → {lock}")
+    print(f"  N5  lock code → {lock}")
 
     lock_img = Image.new("RGB", (900, 360), (20, 20, 24))
     d = ImageDraw.Draw(lock_img)
