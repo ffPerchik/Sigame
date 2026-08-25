@@ -80,5 +80,37 @@ class HostFeatureWiringTests(unittest.TestCase):
         self.assertIn("_gate_keyboard(player[\"user_id\"], stage_id)", pending)
 
 
+class SingleInstanceGuardTests(unittest.TestCase):
+    def test_persistent_conflict_exits(self):
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        from aiogram.exceptions import TelegramConflictError
+        from aiogram.methods import GetUpdates
+
+        from bot import bot as botmod
+
+        with patch.object(
+            botmod.bot, "get_updates",
+            AsyncMock(side_effect=TelegramConflictError(GetUpdates(), "conflict")),
+        ):
+            with self.assertRaises(SystemExit):
+                asyncio.run(botmod.ensure_single_polling_instance(tries=2))
+
+    def test_transient_conflict_then_ok(self):
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        from aiogram.exceptions import TelegramConflictError
+        from aiogram.methods import GetUpdates
+
+        from bot import bot as botmod
+
+        probe = AsyncMock(side_effect=[TelegramConflictError(GetUpdates(), "conflict"), []])
+        with patch.object(botmod.bot, "get_updates", probe):
+            asyncio.run(botmod.ensure_single_polling_instance(tries=2))
+        self.assertEqual(probe.await_count, 2)
+
+
 if __name__ == "__main__":
     unittest.main()
