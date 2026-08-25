@@ -1,6 +1,7 @@
 """Валидация узла N6 «ТАЙНИК»: решётка Кардано → чужая раскладка → брайль → акростих.
 Сверяет ассеты, константы генератора и accept-ответы в quest/stages.yaml."""
 import ast
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -33,7 +34,8 @@ def _make_source_constants() -> dict:
     )
     tree = ast.parse(source)
     wanted = {
-        "N6_LETTER_LINES", "N6_GRILLE_HOLES", "N6_LAYOUT_CAPTION", "N6_NOTE_LINES",
+        "N6_LETTER_LINES", "N6_GRILLE_HOLES", "N6_LAYOUT_CAPTION",
+        "N6_NOTE_LINES", "N6_FINAL_CIPHER",
     }
     out = {}
     for node in tree.body:
@@ -75,16 +77,30 @@ class N6ChainTests(unittest.TestCase):
         self.assertEqual(braille_decode(cells), "строки")
         self.assertIn("СТРОКИ", self.stages["N6_braille"]["accept"])
 
-    def test_note_acrostic_is_zhenya_zhiv(self):
-        note = (IMAGES / "artifact_6f.txt").read_text(encoding="utf-8").splitlines()
-        self.assertEqual("".join(line[0] for line in note), "ЖЕНЯЖИВ")
-        self.assertEqual(note, self.consts["N6_NOTE_LINES"])
-        self.assertIn("ЖЕНЯ ЖИВ", self.stages["N6_acrostic"]["accept"])
+    def test_keeper_words_from_n1_n5_spell_final_key(self):
+        words = []
+        for n in range(1, 6):
+            text = self.stages[f"N{n}_fragment"]["text"]
+            match = re.search(r"Слово Жени для финала: ([А-ЯЁ]+)", text)
+            self.assertIsNotNone(match, f"N{n}_fragment")
+            words.append(match.group(1))
+        self.assertEqual(words, ["ФОТОПЛЁНКА", "ИМПУЛЬС", "НАЧАЛО", "АПЕРТУРА", "ЛОГИКА"])
+        self.assertEqual("".join(w[0] for w in words), "ФИНАЛ")
+
+    def test_note_cipher_decodes_with_keeper_key(self):
+        from bot.tools.quest_crypto import vigenere
+
+        note = (IMAGES / "artifact_6f.txt").read_text(encoding="utf-8")
+        cipher = self.consts["N6_FINAL_CIPHER"]
+        self.assertIn(cipher, note)
+        self.assertEqual(note.splitlines(), self.consts["N6_NOTE_LINES"])
+        self.assertEqual(vigenere(cipher, "ФИНАЛ", decrypt=True), "ЖЕНЯЖИВ")
+        self.assertIn("ЖЕНЯ ЖИВ", self.stages["N6_final"]["accept"])
 
     def test_stage_chain_order_and_fragment(self):
         chain = [
             "N6_intro", "N6_grille", "N6_videoinfo", "N6_layout",
-            "N6_brailleinfo", "N6_braille", "N6_noteinfo", "N6_acrostic",
+            "N6_brailleinfo", "N6_braille", "N6_noteinfo", "N6_final",
             "N6_fragment",
         ]
         for current, nxt in zip(chain, chain[1:]):

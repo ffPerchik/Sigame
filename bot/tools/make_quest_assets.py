@@ -995,14 +995,16 @@ N6_LETTER_LINES = [
 N6_GRILLE_HOLES = [(1, 13), (2, 2), (4, 7), (5, 1), (6, 12)]
 # Субтитр в ролике набран в физической раскладке QWERTY; в ЙЦУКЕН это ТОЧКИ.
 N6_LAYOUT_CAPTION = "njxrb"
+# Финал: Виженер с ключом ФИНАЛ (первые буквы слов Жени из фрагментов N1–N5).
+N6_FINAL_CIPHER = "ЪНЪЯСЬК"
 N6_NOTE_LINES = [
-    "Жди. Я вернусь, когда аргус отвлечётся.",
-    "Если что-то пошло не так —",
-    "Не ищи меня в сети.",
-    "Я оставил всё, что нужно.",
-    "Жив. Просто прячусь.",
-    "Иначе он доберётся до нас обоих.",
-    "Всё будет хорошо.",
+    "если ты дошёл до этого места — ты собрал все пять моих слов.",
+    "ключ — их первые буквы, в порядке узлов.",
+    "то, что я не мог сказать вслух, записано ниже.",
+    "",
+    "ЪНЪЯСЬК",
+    "",
+    "жди меня. я вернусь, когда аргус отвлечётся.",
 ]
 
 
@@ -1014,7 +1016,8 @@ def make_n6():
     """Тайник Жени: письмо+плёнка (Кардано), ролик (раскладка), брайль, акростих."""
     assert _grille_extract(N6_LETTER_LINES, N6_GRILLE_HOLES).upper() == "ТИТРЫ"
     assert wrong_layout_to_ru(N6_LAYOUT_CAPTION) == "точки"
-    assert "".join(line[0] for line in N6_NOTE_LINES) == "ЖЕНЯЖИВ"
+    assert vigenere(N6_FINAL_CIPHER, "ФИНАЛ", decrypt=True) == "ЖЕНЯЖИВ"
+    assert N6_FINAL_CIPHER in N6_NOTE_LINES
 
     w, h = 1000, 700
     mono = mono_font(30)
@@ -1112,7 +1115,7 @@ def make_n6():
     (OUT / "artifact_6f.txt").write_text(
         "\n".join(N6_NOTE_LINES) + "\n", encoding="utf-8"
     )
-    print("  N6  note acrostic → ЖЕНЯ ЖИВ")
+    print(f"  N6  note cipher {N6_FINAL_CIPHER} (ключ ФИНАЛ) → ЖЕНЯ ЖИВ")
 
 
 def write_readme():
