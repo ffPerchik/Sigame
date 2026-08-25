@@ -667,6 +667,7 @@ def make_n3():
     assert polybius_pairs == ["43", "14", "11", "41", "45", "16"]
     # Финал: шапка — перемешанная СТРОФА. Сортировка даёт 356412.
     # Первая цифра пар листа III меняется на место этой цифры в 356412.
+    # На листе IV пара читается наоборот: сначала столбец, потом строка.
     keyword = polybius_plain
     header_key = "ФАСОТР"
     assert sorted(header_key) == sorted(keyword)
@@ -676,9 +677,9 @@ def make_n3():
     answer4 = "ИСТИНА"
     picks = []
     for pair in polybius_pairs:
-        row, column = int(pair[0]), int(pair[1])
-        picks.append((sort_order.index(row) + 1, column))
-    assert picks == [(4, 3), (5, 4), (5, 1), (4, 1), (4, 5), (5, 6)]
+        column, row = int(pair[0]), int(pair[1])
+        picks.append((row, sort_order.index(column) + 1))
+    assert picks == [(3, 4), (4, 5), (1, 5), (1, 4), (5, 4), (6, 5)]
     assert len(set(picks)) == len(picks) == len(answer4) == 6
     grid_letters = [[""] * 6 for _ in range(6)]
     for (row, column), letter in zip(picks, answer4):
