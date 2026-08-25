@@ -10,7 +10,9 @@ from pathlib import Path
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
-from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
+from aiogram.exceptions import (
+    TelegramBadRequest, TelegramConflictError, TelegramRetryAfter,
+)
 from aiogram.filters import BaseFilter, Command, CommandStart
 from aiogram.types import (
     CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message,
@@ -276,16 +278,25 @@ async def _send_hub(uid: int) -> None:
     lines = [T.HUB_HEADER, ""]
     for nid, meta in nodes.items():
         n = nid[1:]
-        tmpl = T.HUB_LINE_DONE if status[nid] == "done" else T.HUB_LINE_TODO
+        if status[nid] == "done":
+            tmpl = T.HUB_LINE_DONE
+        elif db.is_node_hidden(nid, status):
+            continue  # финал скрыт, пока не пройдены первые пять
+        elif not db.is_node_unlocked(nid, status):
+            tmpl = T.HUB_LINE_LOCKED
+        elif nid == db.FINAL_NODE:
+            tmpl = T.HUB_LINE_FINAL
+        else:
+            tmpl = T.HUB_LINE_TODO
         lines.append(tmpl.format(n=n, label=meta.get("label", ""), hint=meta.get("hint", "")))
     lines.append("")
     lines.append(T.HUB_FOOTER.format(done=done_count))
     text = "\n".join(lines)
 
-    # Кнопки: только непройденные узлы
+    # Кнопки: только непройденные и открытые узлы
     buttons = []
     for nid in nodes:
-        if status[nid] != "done":
+        if status[nid] != "done" and db.is_node_unlocked(nid, status):
             buttons.append(InlineKeyboardButton(text=nid, callback_data=f"node:{nid}"))
     kb_lines = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
     kb = InlineKeyboardMarkup(inline_keyboard=kb_lines)
@@ -526,20 +537,28 @@ async def cb_gate_accept(cq: CallbackQuery) -> None:
 
 # ======================== node pick (hub buttons) ===========================
 
+def node_pick_block(uid: int, node_id: str) -> str | None:
+    """Текст алерта-отказа либо None, если вход в узел разрешён."""
+    if db.is_node_done(uid, node_id):
+        return T.NODE_ALREADY_DONE
+    if not db.is_node_unlocked(node_id, db.nodes_status(uid)):
+        return T.NODE_LOCKED.format(node=node_id)
+    if not quest.get_stage(f"{node_id}_intro"):
+        return T.NODE_NOT_FOUND
+    return None
+
+
 @dp.callback_query(F.data.startswith("node:"))
 async def cb_node_pick(cq: CallbackQuery) -> None:
     uid = cq.from_user.id
     node_id = cq.data.split(":", 1)[1]
 
-    if db.is_node_done(uid, node_id):
-        await cq.answer(T.NODE_ALREADY_DONE, show_alert=True)
+    block = node_pick_block(uid, node_id)
+    if block is not None:
+        await cq.answer(block, show_alert=True)
         return
 
     intro_stage = f"{node_id}_intro"
-    if not quest.get_stage(intro_stage):
-        await cq.answer(T.NODE_NOT_FOUND, show_alert=True)
-        return
-
     db.set_stage(uid, intro_stage)
     db.log_event(uid, "node_pick", node_id)
     await cq.answer(T.NODE_PICK_OK.format(node=node_id))
@@ -781,7 +800,7 @@ async def cmd_setstage(message: Message, command: Command) -> None:
     await message.answer(T.SETSTAGE_RESULT.format(uid=uid, stage=stage))
 
 
-@dp.message(HostFilter(), Command("msg", "message"))
+@dp.message(HostFilter(), Command("msg", "message", "m"))
 async def cmd_message_player(message: Message, command: Command) -> None:
     args = (command.args or "").split(maxsplit=1)
     if len(args) < 2:
@@ -898,6 +917,24 @@ async def on_message(message: Message) -> None:
 
 # ======================== main ==============================================
 
+async def ensure_single_polling_instance(tries: int = 5) -> None:
+    """409 на getUpdates означает второй живой экземпляр с этим токеном.
+
+    Несколько попыток терпят переходный конфликт при рестарте (/update),
+    затем процесс выходит с понятным сообщением вместо бесконечного спама.
+    Вызов без offset ничего не подтверждает — очередь обновлений не трогается.
+    """
+    for attempt in range(tries):
+        try:
+            await bot.get_updates(timeout=1)
+            return
+        except TelegramConflictError:
+            if attempt == tries - 1:
+                print(T.SINGLE_INSTANCE_CONFLICT, flush=True)
+                raise SystemExit(1)
+            await asyncio.sleep(1.0)
+
+
 async def main() -> None:
     db.init_db()
     # Старые тестовые БД могли сохранить гейт до пролога. После переноса гейта
@@ -907,6 +944,7 @@ async def main() -> None:
             db.set_stage(player["user_id"], INTRO_STAGE)
             db.log_event(player["user_id"], "stage_migrated", "start_gate -> z_1")
     await bot.delete_webhook(drop_pending_updates=True)
+    await ensure_single_polling_instance()
     me = await bot.get_me()
     extra = " HOST_CONSOLE=1 (уведомления → консоль, гейты → авто)" if cfg.HOST_CONSOLE else ""
     print(T.STARTUP.format(username=me.username, host=cfg.HOST_ID) + extra)

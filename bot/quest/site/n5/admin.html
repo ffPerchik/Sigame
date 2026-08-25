@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Северный учёт · оператор</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="admin-page">
+  <main class="admin-shell">
+    <section class="login-card" id="login-card">
+      <p class="eyebrow">Служебный вход</p>
+      <h1>Панель оператора</h1>
+      <p class="muted">Доступ разрешён только сотрудникам архива.</p>
+      <label>Оператор</label>
+      <input id="login" autocomplete="off" placeholder="operator">
+      <label>Пароль</label>
+      <input id="password" autocomplete="off" placeholder="WORD1-WORD2-WORD3">
+      <button id="enter">Войти</button>
+      <p class="error" id="error"></p>
+    </section>
+
+    <section class="dashboard hidden" id="dashboard">
+      <p class="eyebrow">operator: argus</p>
+      <h1>Расчётный лист №205</h1>
+      <div class="terminal key-board">
+        <p>auth: accepted</p>
+        <div class="key-row">
+          <span>РЕГИСТР</span><strong>МОДУЛЬ</strong>
+        </div>
+        <div class="key-row">
+          <span>РЕЕСТР</span><strong>ЧИСЛО</strong>
+        </div>
+        <div class="key-row">
+          <span>ИСТОЧНИК</span><strong>ЛОК</strong>
+        </div>
+        <div class="key-row">
+          <span>ОПЕРАТОР</span><strong>ARGUS</strong>
+        </div>
+      </div>
+      <p class="muted">Слова уже приняли верные позиции, введите код подтверждения</p>
+      <div class="lock-panel" data-rule="код принимает длины слов">
+        <label>Кодовый замок</label>
+        <div class="digit-lock" aria-label="Кодовый замок">
+          <input class="digit" inputmode="numeric" maxlength="1" autocomplete="off">
+          <input class="digit" inputmode="numeric" maxlength="1" autocomplete="off">
+          <input class="digit" inputmode="numeric" maxlength="1" autocomplete="off">
+          <input class="digit" inputmode="numeric" maxlength="1" autocomplete="off">
+        </div>
+        <button id="close-node">Закрыть расчёт</button>
+      </div>
+      <div class="result hidden" id="result">
+        <h2>Расчёт закрыт</h2>
+        <p>Код для Telegram-бота:</p>
+        <pre id="bot-code"></pre>
+      </div>
+    </section>
+  </main>
+  <script src="admin.js"></script>
+</body>
+</html>

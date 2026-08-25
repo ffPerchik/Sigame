@@ -12,13 +12,13 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 try:
     from .quest_crypto import (
-        RU, RU_WITH_YO, a1z26_encode, atbash, only_ru, pigpen_cell,
-        rail_fence_enc, vigenere,
+        RU, RU_WITH_YO, a1z26_encode, atbash, braille_encode, only_ru,
+        pigpen_cell, rail_fence_enc, vigenere, wrong_layout_to_ru,
     )
 except ImportError:  # запуск как `python bot/tools/make_quest_assets.py`
     from quest_crypto import (
-        RU, RU_WITH_YO, a1z26_encode, atbash, only_ru, pigpen_cell,
-        rail_fence_enc, vigenere,
+        RU, RU_WITH_YO, a1z26_encode, atbash, braille_encode, only_ru,
+        pigpen_cell, rail_fence_enc, vigenere, wrong_layout_to_ru,
     )
 
 BOT_ROOT = Path(__file__).resolve().parent.parent
@@ -59,6 +59,18 @@ def script_font(size: int) -> ImageFont.FreeTypeFont:
     if not SCRIPT_FONT.exists():
         raise FileNotFoundError(f"Нет каллиграфического шрифта: {SCRIPT_FONT}")
     return ImageFont.truetype(str(SCRIPT_FONT), size)
+
+
+def mono_font(size: int) -> ImageFont.FreeTypeFont:
+    """Моноширинный шрифт из репо — нужен для символьных сеток (решётка Кардано)."""
+    candidates = [
+        BOT_ROOT / "tools" / "fonts" / "DejaVuSansMono-Bold.ttf",
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"),
+    ]
+    for p in candidates:
+        if p.exists():
+            return ImageFont.truetype(str(p), size)
+    raise FileNotFoundError("Нет моноширинного шрифта с кириллицей")
 
 
 def parchment_page(source: Path = PARCHMENT_SOURCE) -> Image.Image:
@@ -629,7 +641,7 @@ def make_n2():
 
 # ===================================================================== N3
 def make_n3():
-    """Четыре реалистичных листа: pigpen → rail → Polybius → book cipher."""
+    """Четыре реалистичных листа: pigpen → rail → Polybius → pigpen-решётка."""
     word1 = "РЕШЕТКА"
     crib = "СИКССЕВЕН"
     # Рельсы называют новый метод, не повторяя Виженера из N2.
@@ -645,31 +657,40 @@ def make_n3():
     assert rail_counts == [7, 14, 7]
     assert "".join(rail_rows) == rail_c
 
-    polybius_plain = "СТРОФА"
+    polybius_plain = "СЮЖЕТЫ"
     polybius_alphabet = "".join(dict.fromkeys(word1 + RU_WITH_YO))
     polybius_pairs = []
     for letter in polybius_plain:
         index = polybius_alphabet.index(letter)
         polybius_pairs.append(f"{index // 6 + 1}{index % 6 + 1}")
     assert len(polybius_alphabet) == 33
-    assert polybius_pairs == ["43", "14", "11", "41", "45", "16"]
-    # Три предыдущих ответа становятся инструкцией к финалу:
-    # РЕШЕТКА = 6×6 слов, ПОЛИБИЙ = строка.столбец, СТРОФА = материал.
-    stanza = [
-        "Серый иней трогает старые камни тихо",       # 1.2 И
-        "В саду свет едва дышит ночью",               # 2.3 С
-        "Под крышей тишина лежит до рассвета",        # 3.3 Т
-        "Снова иней на ветках хранит следы",          # 4.2 И
-        "В этой ночи открыт старый проход",           # 5.3 Н
-        "Храни архив как начало нашей памяти",        # 6.2 А
-    ]
-    assert all(len(line.split()) == 6 for line in stanza)
-    picks = [(1, 2), (2, 3), (3, 3), (4, 2), (5, 3), (6, 2)]
-    got = []
-    for line_index, word_index in picks:
-        word = stanza[line_index - 1].split()[word_index - 1]
-        got.append(only_ru(word)[0])
-    assert "".join(got) == "ИСТИНА", got
+    assert polybius_pairs == ["43", "62", "26", "12", "14", "55"]
+    # Финал: шапка — перемешанная СЮЖЕТЫ. Сортировка даёт 361245.
+    # Первая цифра пар листа III меняется на место этой цифры в 361245.
+    # На листе IV пара читается наоборот: сначала столбец, потом строка.
+    keyword = polybius_plain
+    header_key = "ЖЕСТЫЮ"
+    assert sorted(header_key) == sorted(keyword)
+    assert header_key != keyword
+    sort_order = [header_key.index(letter) + 1 for letter in keyword]
+    assert sort_order == [3, 6, 1, 2, 4, 5]
+    answer4 = "ПРАВДА"
+    picks = []
+    for pair in polybius_pairs:
+        column, row = int(pair[0]), int(pair[1])
+        picks.append((row, sort_order.index(column) + 1))
+    assert picks == [(3, 5), (2, 2), (6, 4), (2, 3), (4, 3), (5, 6)]
+    assert len(set(picks)) == len(picks) == len(answer4) == 6
+    grid_letters = [[""] * 6 for _ in range(6)]
+    for (row, column), letter in zip(picks, answer4):
+        grid_letters[row - 1][column - 1] = letter
+    noise = [ch for ch in RU if ch not in answer4]
+    for row in range(6):
+        for column in range(6):
+            if not grid_letters[row][column]:
+                grid_letters[row][column] = noise[(row * 7 + column * 3) % len(noise)]
+    got = [grid_letters[row - 1][column - 1] for row, column in picks]
+    assert "".join(got) == answer4, got
 
     ink = (62, 39, 23)
     faded_ink = (92, 62, 39)
@@ -797,32 +818,62 @@ def make_n3():
     centered_text(draw, "  ".join(polybius_pairs), 1035, script_font(82), accent)
     page3.save(OUT / "artifact_3c.png", optimize=True)
 
-    # Лист IV: книжные координаты остаются частью самого рукописного листа.
+    # Лист IV: шапка — перемешанная СЮЖЕТЫ. Сортировка даёт координаты.
     page4 = parchment_page(PARCHMENT_SOURCE_4)
     draw = ImageDraw.Draw(page4)
-    centered_text(draw, "Лист IV", 95, script_font(82), ink)
-    centered_text(draw, "три прежних слова — одна инструкция", 205, script_font(42), faded_ink)
-    line_font = script_font(42)
-    number_font = script_font(40)
-    for index, line in enumerate(stanza, start=1):
-        y = 315 + (index - 1) * 125
-        draw.text((120, y), f"{index}.", fill=ink, font=number_font)
-        draw.text((190, y), line, fill=ink, font=line_font)
-    coordinates = "   ".join(f"{line}.{word}" for line, word in picks)
-    centered_text(draw, coordinates, 1090, script_font(60), accent)
-    centered_text(
-        draw,
-        "первое — форма · второе — путь · третье — текст",
-        1225,
-        script_font(36),
-        faded_ink,
-    )
+    centered_text(draw, "Лист IV", 70, script_font(82), ink)
+    centered_text(draw, "верхний ряд сбился с порядка", 170, script_font(40), faded_ink)
+    centered_text(draw, "третье слово знает, как его вернуть", 230, script_font(38), faded_ink)
+
+    grid_x, grid_y, cell = 245, 430, 85
+    grid_size = cell * 6
+    label_font = script_font(32)
+    for index in range(7):
+        offset = index * cell
+        draw.line((grid_x + offset, grid_y, grid_x + offset, grid_y + grid_size), fill=ink, width=3)
+        draw.line((grid_x, grid_y + offset, grid_x + grid_size, grid_y + offset), fill=ink, width=3)
+    header_scale = 13
+    cell_scale = 18
+    for index, letter in enumerate(header_key):
+        draw.text(
+            (grid_x + index * cell + cell / 2, grid_y - 88),
+            str(index + 1), fill=faded_ink, font=label_font, anchor="mm",
+        )
+        draw_pigpen(
+            draw,
+            (
+                int(grid_x + index * cell + cell / 2 - header_scale),
+                grid_y - 68,
+            ),
+            letter,
+            scale=header_scale,
+            color=ink,
+            width=4,
+        )
+        draw.text(
+            (grid_x - 32, grid_y + index * cell + cell / 2),
+            str(index + 1), fill=faded_ink, font=label_font, anchor="mm",
+        )
+    for row in range(6):
+        for column in range(6):
+            draw_pigpen(
+                draw,
+                (
+                    int(grid_x + column * cell + cell / 2 - cell_scale),
+                    int(grid_y + row * cell + cell / 2 - cell_scale),
+                ),
+                grid_letters[row][column],
+                scale=cell_scale,
+                color=ink,
+                width=5,
+            )
+    centered_text(draw, "язык первого листа ещё нужен", 1185, script_font(40), faded_ink)
     page4.save(OUT / "artifact_3d.png", optimize=True)
 
     print(f"  N3  pigpen {word1}; crib {crib}")
     print(f"  N3  rail {rail_plain} → {rail_c}")
     print(f"  N3  polybius key={word1} {polybius_plain} → {' '.join(polybius_pairs)}")
-    print(f"  N3  book {coordinates} → {''.join(got)}")
+    print(f"  N3  pigpen-grid header={header_key} sort={sort_order} {polybius_pairs} → {picks} → {''.join(got)}")
 
 
 # ===================================================================== N4
@@ -837,7 +888,7 @@ def make_n4():
 
 # ===================================================================== N5
 def make_n5():
-    """binary МОДУЛЬ + magic square ЧИСЛО + html comment HEX + lock 2-5-8-4."""
+    """binary МОДУЛЬ + magic square ЧИСЛО + html comment HEX + lock 2358."""
     word_bin = "МОДУЛЬ"
     bits = " ".join(f"{RU.index(ch) + 1:06b}" for ch in word_bin)
 
@@ -885,11 +936,11 @@ def make_n5():
 """
     # ЛОК = d0bb d0be d0ba
     (OUT / "artifact_5b.html").write_text(html, encoding="utf-8")
-    lock = "2584"  # fib
+    lock = "2358"  # четыре числа после двух единиц в ряду Фибоначчи
     print(f"  N5  binary → {word_bin}")
     print(f"  N5  square → {word_sq}")
     print(f"  N5  html comment HEX → ЛОК")
-    print(f"  N5  lock (fib 2,5,8,13 truncated 4) shown in verse? → {lock}")
+    print(f"  N5  lock code → {lock}")
 
     lock_img = Image.new("RGB", (900, 360), (20, 20, 24))
     d = ImageDraw.Draw(lock_img)
@@ -903,38 +954,143 @@ def make_n5():
 
 
 # ===================================================================== N6
+# Узел «ТАЙНИК»: четыре носителя (бумага, видео, пластина, записка) и четыре
+# новых приёма (решётка Кардано, чужая раскладка, брайль, акростих).
+N6_LETTER_LINES = [
+    "если ты читаешь это",
+    "я успел собрать сейф",
+    "вниз под полосой",
+    "не верь аргусу он врёт",
+    "держи этот лист твёрдо",
+    "проверь раму окна",
+    "ключи и шкафы",
+    "и не ищи меня в сети",
+]
+# (строка, колонка) дырок решётки; чтение по порядку строк даёт ТИТРЫ.
+N6_GRILLE_HOLES = [(1, 13), (2, 2), (4, 7), (5, 1), (6, 12)]
+# Субтитр в ролике набран в физической раскладке QWERTY; в ЙЦУКЕН это ТОЧКИ.
+N6_LAYOUT_CAPTION = "njxrb"
+# Финал: Виженер с ключом ФИНАЛ (первые буквы слов Жени из фрагментов N1–N5).
+N6_FINAL_CIPHER = "ЪНЪЯСЬК"
+N6_NOTE_LINES = [
+    "если ты дошёл до этого места — ты собрал все пять моих слов.",
+    "ключ — их первые буквы, в порядке узлов.",
+    "то, что я не мог сказать вслух, записано ниже.",
+    "",
+    "ЪНЪЯСЬК",
+    "",
+    "жди меня. я вернусь, когда аргус отвлечётся.",
+]
+
+
+def _grille_extract(lines, holes):
+    return "".join(lines[r][c] for r, c in sorted(holes))
+
+
 def make_n6():
-    """Атбаш → изгородь → Виженер с ключом из шага 1 → ПОРТАЛ."""
-    step1_plain = "АТБАШ"
-    step1_c = atbash(step1_plain)  # they see cipher, decode with atbash
+    """Тайник Жени: письмо+плёнка (Кардано), ролик (раскладка), брайль, акростих."""
+    assert _grille_extract(N6_LETTER_LINES, N6_GRILLE_HOLES).upper() == "ТИТРЫ"
+    assert wrong_layout_to_ru(N6_LAYOUT_CAPTION) == "точки"
+    assert vigenere(N6_FINAL_CIPHER, "ФИНАЛ", decrypt=True) == "ЖЕНЯЖИВ"
+    assert N6_FINAL_CIPHER in N6_NOTE_LINES
 
-    rail_plain = "ВИЖНЕР"
-    rail_c = rail_fence_enc(rail_plain, 3)
+    w, h = 1000, 700
+    mono = mono_font(30)
+    cw = mono.getlength("ММММ") / 4
+    x0, y0, line_h = 60, 160, 54
 
-    vig_plain = "ПОРТАЛ"
-    vig_c = vigenere(vig_plain, "АТБАШ")
+    # --- письмо (бумага) ---
+    letter = Image.new("RGB", (w, h), (236, 230, 212))
+    d = ImageDraw.Draw(letter)
+    d.text((x0, 40), "НЕ ОТПРАВЛЕНО", fill=(160, 50, 45), font=font(28))
+    d.text((x0, 90), "черновик · монитор k@ly$%ev", fill=(120, 110, 90), font=font(20))
+    for r, line in enumerate(N6_LETTER_LINES):
+        for c, ch in enumerate(line):
+            d.text((x0 + c * cw, y0 + r * line_h), ch, fill=(35, 32, 40), font=mono)
+    for mx, my in ((24, 24), (w - 44, 24), (24, h - 44)):
+        d.rectangle((mx, my, mx + 20, my + 20), fill=(30, 30, 30))
+    text_rect = (40, 120, w - 40, y0 + len(N6_LETTER_LINES) * line_h + 16)
+    hack_glitch(letter, seed=61, keep_rect=text_rect, power=0.7).save(
+        OUT / "artifact_6a.png"
+    )
 
-    # also A1Z26 line as first visible hook
-    nums = a1z26_encode(step1_c)
+    # --- обгоревшая плёнка с дырками (решётка Кардано) ---
+    film = Image.new("RGB", (w, h), (12, 12, 14))
+    d = ImageDraw.Draw(film)
+    for r, c in N6_GRILLE_HOLES:
+        cx, cy = x0 + c * cw + cw / 2, y0 + r * line_h + 20
+        d.ellipse((cx - cw * 0.75, cy - 24, cx + cw * 0.75, cy + 24), fill=(236, 230, 212))
+        d.ellipse(
+            (cx - cw * 0.75 - 5, cy - 29, cx + cw * 0.75 + 5, cy + 29),
+            outline=(70, 60, 50), width=5,
+        )
+    for mx, my in ((24, 24), (w - 44, 24), (24, h - 44)):
+        d.rectangle((mx, my, mx + 20, my + 20), fill=(230, 230, 230))
+    hack_glitch(film, seed=62, power=0.8).save(OUT / "artifact_6b.png")
+    print(f"  N6  grille holes → {_grille_extract(N6_LETTER_LINES, N6_GRILLE_HOLES)}")
 
-    img = Image.new("RGB", (1100, 780), (18, 18, 22))
-    d = ImageDraw.Draw(img)
-    d.text((36, 24), "ПОСЛЕДНИЙ ЗАМОК · четыре щеколды", fill=(220, 200, 140), font=font(28))
-    d.text((36, 90), "I  A1Z26  (А=01 … Я=32)", fill=(140, 140, 150), font=font(22))
-    d.text((36, 130), nums, fill=(240, 240, 245), font=font(40))
-    d.text((36, 210), "II  то, что получилось — пропусти через зеркало алфавита", fill=(140, 140, 150), font=font(22))
-    d.text((36, 280), "III  затем — три рельса, зигзаг", fill=(140, 140, 150), font=font(22))
-    d.text((36, 320), rail_c, fill=(240, 240, 245), font=font(48))
-    d.text((36, 410), "IV  Виженер. Ключ — слово из щеколды II.", fill=(140, 140, 150), font=font(22))
-    d.text((36, 460), vig_c, fill=(240, 220, 120), font=font(56))
-    d.text((36, 560), "Алфавит везде один: 32 буквы, без Ё.", fill=(110, 110, 120), font=font(20))
-    # null cipher telestich as extra confirmation of ПОРТАЛ? skip to not leak
-    img.save(OUT / "artifact_6a.png")
+    # --- ролик с монитора: субтитр в чужой раскладке ---
+    exe = ffmpeg()
+    frames_dir = OUT / "_n6_frames"
+    frames_dir.mkdir(exist_ok=True)
+    vw, vh = 960, 540
+    n_frames = 40
+    for i in range(n_frames):
+        img = Image.new("RGB", (vw, vh), (16, 18, 24))
+        d = ImageDraw.Draw(img)
+        d.text((24, 16), f"REC  00:00:{i:02d}", fill=(180, 40, 40), font=font(22))
+        d.text((vw - 320, 16), "захват · монитор k@ly$%ev", fill=(110, 110, 120), font=font(18))
+        d.rectangle((60, 80, vw - 60, vh - 120), outline=(70, 74, 86), width=2)
+        d.text((80, 96), "блокнот — без названия", fill=(150, 150, 160), font=font(20))
+        if i % 2 == 0:  # мигающий курсор
+            d.rectangle((84, 150, 96, 178), fill=(220, 220, 225))
+        if i >= 16:
+            d.text((250, vh - 90), N6_LAYOUT_CAPTION, fill=(215, 215, 220), font=font(36))
+            d.text((250, vh - 44), "субтитры: авто", fill=(100, 100, 110), font=font(16))
+        hack_glitch(img, seed=63 + i).save(frames_dir / f"f{i:03d}.png")
 
-    print(f"  N6  A1Z26 of atbash(АТБАШ)={step1_c} → {nums}")
-    print(f"  N6  atbash → {step1_plain}")
-    print(f"  N6  rail {rail_c} → {rail_plain}")
-    print(f"  N6  vig({step1_plain}) {vig_c} → {vig_plain}")
+    Image.open(frames_dir / "f020.png").save(OUT / "artifact_6d.png")
+    if exe:
+        cmd = [
+            exe, "-y", "-hide_banner", "-loglevel", "error",
+            "-framerate", "6", "-i", str(frames_dir / "f%03d.png"),
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", str(OUT / "artifact_6c.mp4"),
+        ]
+        subprocess.run(cmd, check=True, timeout=60)
+        print(f"  N6  video caption {N6_LAYOUT_CAPTION} → {wrong_layout_to_ru(N6_LAYOUT_CAPTION)}")
+    else:
+        print("  N6  ⚠ нет ffmpeg, только кадры")
+
+    # --- пластина с брайлем ---
+    from PIL.PngImagePlugin import PngInfo
+
+    pw, ph = 980, 380
+    plate = Image.new("RGB", (pw, ph), (26, 28, 34))
+    d = ImageDraw.Draw(plate)
+    d.text((32, 24), "ПЛАСТИНА · дубль на ощупь", fill=(150, 150, 160), font=font(24))
+    cells = braille_encode("СТРОКИ")
+    for idx, cell in enumerate(cells):
+        bx = 60 + idx * 150
+        by = 140
+        dots = {int(v) for v in cell}
+        for dot in range(1, 7):
+            dx = bx + (0 if dot in (1, 2, 3) else 56)
+            dy = by + {1: 0, 2: 52, 3: 104, 4: 0, 5: 52, 6: 104}[dot]
+            if dot in dots:
+                d.ellipse((dx, dy, dx + 34, dy + 34), fill=(226, 222, 208))
+                d.ellipse((dx + 6, dy + 6, dx + 18, dy + 18), fill=(250, 248, 240))
+            else:
+                d.ellipse((dx, dy, dx + 34, dy + 34), outline=(60, 62, 70), width=2)
+    meta = PngInfo()
+    meta.add_text("note", "точки — это буквы. считай, не смотри.")
+    hack_glitch(plate, seed=64, power=0.5).save(OUT / "artifact_6e.png", pnginfo=meta)
+    print(f"  N6  braille cells {' '.join(cells)} → СТРОКИ")
+
+    # --- записка-акростих ---
+    (OUT / "artifact_6f.txt").write_text(
+        "\n".join(N6_NOTE_LINES) + "\n", encoding="utf-8"
+    )
+    print(f"  N6  note cipher {N6_FINAL_CIPHER} (ключ ФИНАЛ) → ЖЕНЯ ЖИВ")
 
 
 def write_readme():

@@ -45,7 +45,7 @@ class HintSequenceTests(unittest.TestCase):
     def test_no_balance_and_reset_are_handled(self):
         self.assertEqual(db.consume_hint(42, "N4_flash", 1), ("ok", 1, 0))
         self.assertEqual(db.consume_hint(42, "N5_bin", 1), ("ok", 0, 0))
-        self.assertEqual(db.consume_hint(42, "N6_a1", 1), ("no_balance", 0, 0))
+        self.assertEqual(db.consume_hint(42, "N6_grille", 1), ("no_balance", 0, 0))
 
         db.set_banked(42, 1)
         db.reset_hint_usage(42)
@@ -61,7 +61,7 @@ class HostFeatureWiringTests(unittest.TestCase):
         self.source = (REPO_ROOT / "bot" / "bot.py").read_text(encoding="utf-8")
 
     def test_direct_messages_and_answer_relay_are_wired(self):
-        self.assertIn('Command("msg", "message")', self.source)
+        self.assertIn('Command("msg", "message", "m")', self.source)
         self.assertIn("HOST_MESSAGE_PLAYER", self.source)
         self.assertIn("ANSWER_ATTEMPT_HOST", self.source)
         self.assertIn('db.log_event(uid, "answer_attempt"', self.source)
@@ -78,6 +78,38 @@ class HostFeatureWiringTests(unittest.TestCase):
         self.assertIn("gates = _pending_gate_players()", pending)
         self.assertIn("PENDING_GATE_LINE", pending)
         self.assertIn("_gate_keyboard(player[\"user_id\"], stage_id)", pending)
+
+
+class SingleInstanceGuardTests(unittest.TestCase):
+    def test_persistent_conflict_exits(self):
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        from aiogram.exceptions import TelegramConflictError
+        from aiogram.methods import GetUpdates
+
+        from bot import bot as botmod
+
+        with patch.object(
+            botmod.bot, "get_updates",
+            AsyncMock(side_effect=TelegramConflictError(GetUpdates(), "conflict")),
+        ):
+            with self.assertRaises(SystemExit):
+                asyncio.run(botmod.ensure_single_polling_instance(tries=2))
+
+    def test_transient_conflict_then_ok(self):
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        from aiogram.exceptions import TelegramConflictError
+        from aiogram.methods import GetUpdates
+
+        from bot import bot as botmod
+
+        probe = AsyncMock(side_effect=[TelegramConflictError(GetUpdates(), "conflict"), []])
+        with patch.object(botmod.bot, "get_updates", probe):
+            asyncio.run(botmod.ensure_single_polling_instance(tries=2))
+        self.assertEqual(probe.await_count, 2)
 
 
 if __name__ == "__main__":

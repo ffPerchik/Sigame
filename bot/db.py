@@ -102,6 +102,28 @@ def count_nodes_done(user_id: int) -> int:
     return sum(1 for v in nodes_status(user_id).values() if v == "done")
 
 
+FINAL_NODE = "N6"
+PREREQUISITE_NODES = ("N1", "N2", "N3", "N4", "N5")
+# Временно: узел виден в хабе с замком, войти нельзя. Убрать N4 из кортежа — и замок спадёт.
+LOCKED_VISIBLE_NODES = ("N4",)
+
+
+def is_node_unlocked(node_id: str, status: dict) -> bool:
+    """Финальный узел — после первых пяти. LOCKED_VISIBLE_NODES закрыты всегда."""
+    if node_id in LOCKED_VISIBLE_NODES:
+        return False
+    if node_id != FINAL_NODE:
+        return True
+    return all(status.get(n) == "done" for n in PREREQUISITE_NODES)
+
+
+def is_node_hidden(node_id: str, status: dict) -> bool:
+    """Скрыть из хаба (N6 до открытия). Замок на N4 как раз должен быть виден."""
+    if node_id in LOCKED_VISIBLE_NODES:
+        return False
+    return not is_node_unlocked(node_id, status)
+
+
 # ---- игроки ----------------------------------------------------------------
 
 def register(user_id: int, username: str, name: str, stage: str) -> None:

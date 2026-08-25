@@ -69,7 +69,7 @@ class N3CardStyleTests(unittest.TestCase):
         n3 = source.split("def make_n3():", 1)[1].split("# ===================================================================== N4", 1)[0]
         self.assertIn(f'rail_plain = "{plain}"', n3)
         self.assertIn("assert rail_counts == [7, 14, 7]", n3)
-        self.assertIn('polybius_pairs == ["43", "14", "11", "41", "45", "16"]', n3)
+        self.assertIn('polybius_pairs == ["43", "62", "26", "12", "14", "55"]', n3)
         self.assertIn('margin_text = "«первое слово начинает алфавит»"', n3)
         self.assertNotIn('margin_text = "на полях:', n3)
         self.assertIn("margin_layer.rotate(90", n3)
@@ -82,11 +82,19 @@ class N3CardStyleTests(unittest.TestCase):
     def test_final_sheet_uses_all_three_previous_answers(self):
         source = (REPO_ROOT / "bot" / "tools" / "make_quest_assets.py").read_text(encoding="utf-8")
         n3 = source.split("def make_n3():", 1)[1].split("# ===================================================================== N4", 1)[0]
-        self.assertIn("РЕШЕТКА = 6×6 слов", n3)
-        self.assertIn("ПОЛИБИЙ = строка.столбец", n3)
-        self.assertIn("СТРОФА = материал", n3)
-        self.assertIn("assert all(len(line.split()) == 6 for line in stanza)", n3)
-        self.assertIn("первое — форма · второе — путь · третье — текст", n3)
+        self.assertIn('header_key = "ЖЕСТЫЮ"', n3)
+        self.assertIn("sorted(header_key) == sorted(keyword)", n3)
+        self.assertIn("sort_order == [3, 6, 1, 2, 4, 5]", n3)
+        self.assertIn('answer4 = "ПРАВДА"', n3)
+        self.assertIn("sort_order.index(column) + 1", n3)
+        self.assertIn('[(3, 5), (2, 2), (6, 4), (2, 3), (4, 3), (5, 6)]', n3)
+        self.assertIn("верхний ряд сбился с порядка", n3)
+        self.assertIn("третье слово знает, как его вернуть", n3)
+        self.assertIn("язык первого листа ещё нужен", n3)
+        self.assertIn("draw_pigpen(", n3.split("page4 = parchment_page")[1])
+        self.assertNotIn('unique_key == "РЕШТКА"', n3)
+        self.assertNotIn("столбцы помнят первое слово", n3)
+        self.assertNotIn("Тихий ветер гасит свет пряча архив", n3)
 
     def test_reference_and_open_font_are_bundled(self):
         source_dir = REPO_ROOT / "bot" / "quest" / "source"
