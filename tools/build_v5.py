@@ -17,13 +17,18 @@
 """
 from __future__ import annotations
 
-import base64
 import datetime
 import hashlib
 import sys
+import tempfile
 import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+try:
+    from .assign_question_types import apply_question_types, validate_question_types
+except ImportError:  # `python tools/build_v5.py`
+    from assign_question_types import apply_question_types, validate_question_types
 
 NS = "https://github.com/VladimirKhil/SI/blob/master/assets/siq_5.xsd"
 ET.register_namespace("", NS)
@@ -169,41 +174,65 @@ ROUND_PLAN = [
 
 
 def quest_start_text() -> str:
-    """Скрытый START.txt внутри .siq — первый (расширяемый) шаг квеста.
-
-    Два слоя Base64:
-      • первый — приветствие + намёк «ищи ключ ниже»,
-      • второй — сам код (entry_code в stages.yaml).
-    Игрок должен ввести код боту через /start ARGUS1001.
-    """
-    greet = ("ПОЗДРАВЛЯЮ. ТЫ НАШЁЛ ВХОД В ИНДИВИДУАЛЬНЫЙ КВЕСТ — "
-             "КАЖДЫЙ ИДЁТ САМ ЗА СЕБЯ. СЛЕДУЮЩИЙ СЛОЙ СПРЯТАН ГЛУБЖЕ: "
-             "В КАРТИНКАХ, В ОТВЕТАХ, В РЕАЛЬНЫХ ТОЧКАХ. "
-             "ВТОРОЙ БЛОК — ЭТО КЛЮЧ В БОТ. ХОРОШО СПРЯТАННОЕ — "
-             "ХОРОШО НАЙДЁННОЕ.")
-    code = "ARGUS1001"
-    a = base64.b64encode(greet.encode("utf-8")).decode("ascii")
-    b = base64.b64encode(code.encode("utf-8")).decode("ascii")
-    a_lines = "\n".join(a[i:i + 64] for i in range(0, len(a), 64))
-    b_lines = "\n".join(b[i:i + 64] for i in range(0, len(b), 64))
+    """Точный текст START.txt, согласованный с содержимым готового пакета."""
+    message = (
+        "0J/QntCX0JTQoNCQ0JLQm9Cv0K4sINGC0Ysg0L3QtSDQsdC10LfQvdCw0LTRkdC20LXQvSwg"
+        "QVJHVVMg0LLQv9C10YfQsNGC0LvRkdC9LiDQndC40LbQtSDQutC+0LQsINC60L7RgtC+0YDR"
+        "i9C5INC00LDRgdGCINGC0LXQsdC1INC00L7RgdGC0YPQvy4g0JTQsNC70YzRiNC1INCa0JDQ"
+        "ltCU0KvQmSDQodCQ0Jwg0JfQkCDQodCV0JHQry4g0KHQm9CV0JTQo9Cu0KnQmNCZINCh0JvQ"
+        "ntCZINCh0J/QoNCv0KLQkNCdINCT0JvQo9CR0JbQlTog0JIg0JrQkNCg0KLQmNCd0JrQkNCl"
+        "LCDQkiDQntCi0JLQldCi0JDQpSwg0JIg0KjQmNCk0KDQkNCl0KXQntCg0J7QqNCeINCh0J/Q"
+        "oNCv0KLQkNCd0J3QntCVIOKAlCDQpdCe0KDQntCo0J4g0J3QkNCZ0JTQgdCd0J3QntCVLg=="
+    )
+    key = "QVJHVVMxMDAx"
     return (
         "   ╔══════════════════════════════════════════════╗\n"
-        "   ║   ВЫ НАШЛИ НАЧАЛО                             ║\n"
+        "   ║   ВЫ НАШЛИ НАЧАЛО                                          ║\n"
         "   ╚══════════════════════════════════════════════╝\n"
         "\n"
         "   Тот, кто читает это, — перестал быть просто игроком.\n"
+        "\n"
         "   Дальше каждый сам за себя.\n"
         "\n"
-        "   Первое послание закодировано (Base64 → UTF-8). Расшифруй:\n"
+        "   Первое послание закодировано. Расшифруй:\n"
         "\n"
-        f"{a_lines}\n"
+        f"{message}\n"
         "\n"
-        "   Второй блок — ключ в бот. Та же кодировка:\n"
+        "   Та же кодировка:\n"
         "\n"
-        f"{b_lines}\n"
+        f"{key}\n"
         "\n"
-        "   — хороший поиск вознаграждается. Продолжение следует.\n"
+        "   — хороший поиск вознаграждается.\n"
     )
+
+
+def update_start_text_in_package(package_path: Path = OUT_SIQ) -> None:
+    """Обновляет только START.txt, не пересобирая раунды и медиа пакета."""
+    with zipfile.ZipFile(package_path, "r") as source:
+        entries = [(info, source.read(info.filename)) for info in source.infolist()]
+
+    with tempfile.NamedTemporaryFile(
+        dir=package_path.parent,
+        prefix=package_path.stem + "-start-",
+        suffix=".tmp",
+        delete=False,
+    ) as temporary:
+        temporary_path = Path(temporary.name)
+
+    try:
+        with zipfile.ZipFile(temporary_path, "w") as target:
+            found = False
+            for info, data in entries:
+                if info.filename == "START.txt":
+                    data = quest_start_text().encode("utf-8")
+                    found = True
+                target.writestr(info, data)
+            if not found:
+                target.writestr("START.txt", quest_start_text())
+        temporary_path.replace(package_path)
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
 
 
 def main() -> int:
@@ -259,6 +288,12 @@ def main() -> int:
         n_qs = sum(len(t.find(f"{q('questions')}").findall(f"{q('question')}"))
                    for t in ths)
         print(f"  {rname}{' ['+rtype+']' if rtype else ''}: тем={n_themes}, вопросов={n_qs}")
+
+    type_assignments = apply_question_types(root)
+    validate_question_types(root)
+    print("специальные типы вопросов:")
+    for round_name, assigned_types in type_assignments.items():
+        print(f"  {round_name}: {', '.join(assigned_types)}")
 
     # имя/дата пакета
     root.set("name", "Zengame")

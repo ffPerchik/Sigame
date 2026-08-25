@@ -1,25 +1,46 @@
 """Telegram-бот квеста ARGVS-1001: хаб-модель, 6 независимых узлов.
 
 Хаб с кнопками: игрок выбирает узел -> проходит целиком -> возвращается в хаб.
-Точка-пауза (start_gate) после /start <код> до апрува ведущего.
+После пролога ARGVS требует ключ активации, найденный внутри пакета SIGame.
 """
 import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
 from aiogram.filters import BaseFilter, Command, CommandStart
 from aiogram.types import (
     CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message,
 )
+from aiogram.utils.chat_action import ChatActionSender
 
-import config as cfg
-import db
-import quest
-import texts as T
+try:  # `python -m bot.bot`
+    from . import config as cfg
+    from . import db, quest
+    from . import texts as T
+    from .hints import stage_hints
+    from .media_spec import delivery_field, parse_media_spec
+    from .reloader import restart_current_process, validate_python_tree
+    from .timed_messages import (
+        send_messages as send_timed_messages, send_typewriter, wait_before,
+    )
+except ImportError:  # `python bot/bot.py` или запуск из папки bot
+    import config as cfg
+    import db
+    import quest
+    import texts as T
+    from hints import stage_hints
+    from media_spec import delivery_field, parse_media_spec
+    from reloader import restart_current_process, validate_python_tree
+    from timed_messages import (
+        send_messages as send_timed_messages, send_typewriter, wait_before,
+    )
 
 BASE = Path(__file__).resolve().parent
+INTRO_STAGE = quest.first_stage()
 
 if cfg.PROXY:
     _session = AiohttpSession(proxy=cfg.PROXY)
@@ -38,11 +59,80 @@ class HostFilter(BaseFilter):
 
 # ---- helpers ----------------------------------------------------------------
 
+def _host_print(text: str) -> None:
+    print(f"[HOST] {text}", flush=True)
+
+
 async def notify_host(text: str) -> None:
+    if cfg.HOST_CONSOLE:
+        _host_print(text)
+        return
     try:
         await bot.send_message(cfg.HOST_ID, text)
     except Exception:
         pass
+
+
+async def send_host(text: str, **kwargs) -> None:
+    """Сообщение ведущему (кнопки апрува и т.п.). В HOST_CONSOLE — только stdout."""
+    if cfg.HOST_CONSOLE:
+        _host_print(text)
+        return
+    try:
+        await bot.send_message(cfg.HOST_ID, text, **kwargs)
+    except Exception as e:
+        _host_print(f"не удалось написать ведущему: {e}")
+
+
+@asynccontextmanager
+async def _speaker_activity(uid: int, speaker: str | None):
+    """Показывает настоящий Telegram-индикатор для реплик Жени."""
+    if speaker == "zhenya":
+        async with ChatActionSender.typing(bot=bot, chat_id=uid):
+            yield
+    else:
+        yield
+
+
+def _message_activity(uid: int):
+    return lambda item: _speaker_activity(uid, item.speaker)
+
+
+async def _retry_telegram_edit(operation):
+    """Обрабатывает лимит правок и безвредный ответ «message is not modified»."""
+    while True:
+        try:
+            return await operation()
+        except TelegramRetryAfter as error:
+            await asyncio.sleep(max(0.1, float(error.retry_after)))
+        except TelegramBadRequest as error:
+            if "message is not modified" in str(error).lower():
+                return None
+            raise
+
+
+async def _send_typewriter_text(uid: int, text: str):
+    async def edit(message: Message, partial: str):
+        return await _retry_telegram_edit(lambda: message.edit_text(partial))
+
+    return await send_typewriter(
+        text,
+        lambda partial: bot.send_message(uid, partial),
+        edit,
+        interval=cfg.ZHENYA_TYPEWRITER_INTERVAL,
+    )
+
+
+async def _send_typewriter_media(sender, uid: int, path: Path, text: str):
+    async def edit(message: Message, partial: str):
+        return await _retry_telegram_edit(lambda: message.edit_caption(caption=partial))
+
+    return await send_typewriter(
+        text,
+        lambda partial: sender(uid, FSInputFile(path), caption=partial),
+        edit,
+        interval=cfg.ZHENYA_TYPEWRITER_INTERVAL,
+    )
 
 
 def _resolve(arg: str):
@@ -57,6 +147,47 @@ def _name(p) -> str:
     return f"{p['name']} (@{p['username'] or '—'})"
 
 
+def _gate_keyboard(uid: int, stage_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text=T.GATE_ACCEPT_BUTTON,
+            callback_data=f"gate_accept:{uid}:{stage_id}",
+        ),
+    ]])
+
+
+def _pending_gate_players() -> list[tuple[object, str]]:
+    """Гейты хранятся самим текущим stage игрока и переживают рестарт бота."""
+    result = []
+    for player in db.all_players():
+        stage_id = str(player["stage"] or "")
+        stage = quest.get_stage(stage_id)
+        if stage and stage.get("mode") == "gate":
+            result.append((player, stage_id))
+    return result
+
+
+async def _request_gate_approval(uid: int, stage_id: str) -> None:
+    """Ждёт ручного Accept либо автоматически открывает гейт в HOST_CONSOLE."""
+    player = db.get_player(uid)
+    name = _name(player) if player else str(uid)
+
+    if cfg.HOST_CONSOLE:
+        _host_print(f"HOST_CONSOLE=1 → авто-одобрение гейта «{stage_id}» для {uid}")
+        db.log_event(uid, "gate_approved", f"{stage_id} (console)")
+        await advance(uid)
+        return
+
+    try:
+        await bot.send_message(
+            cfg.HOST_ID,
+            T.GATE_APPROVAL_HOST.format(name=name, stage=stage_id),
+            reply_markup=_gate_keyboard(uid, stage_id),
+        )
+    except Exception as error:
+        _host_print(T.GATE_APPROVAL_FAIL.format(name=name, err=error))
+
+
 # ======================== send_stage ========================================
 
 async def send_stage(uid: int, stage_id: str) -> None:
@@ -69,24 +200,63 @@ async def send_stage(uid: int, stage_id: str) -> None:
     if not st:
         await bot.send_message(uid, T.STAGE_MISSING.format(stage=stage_id))
         return
+    messages = st.get("messages") or []
+    if messages:
+        await send_timed_messages(
+            messages,
+            lambda line: bot.send_message(uid, line),
+            activity=_message_activity(uid),
+            progressive_send=lambda line: _send_typewriter_text(uid, line),
+        )
+
     text = (st.get("text") or "").strip()
     media_dir = BASE / "quest" / "images"
-    for field, sender, kind_label in (
-        ("image",    bot.send_photo,    "photo"),
-        ("audio",    bot.send_audio,    "audio"),
-        ("video",    bot.send_video,    "video"),
-        ("document", bot.send_document, "document"),
-    ):
-        fn = st.get(field)
-        if not fn:
-            continue
-        path = Path(fn) if Path(fn).is_absolute() else media_dir / fn
-        try:
-            await sender(uid, FSInputFile(path), caption=text)
-            return
-        except Exception as e:
-            print(T.MEDIA_FAIL.format(kind=kind_label, path=path, err=e))
-    await bot.send_message(uid, text)
+    has_media = any(st.get(field) for field in ("image", "audio", "video", "document"))
+    if not (text or has_media):
+        if st.get("mode") == "gate":
+            await _request_gate_approval(uid, stage_id)
+        return
+
+    media_delivered = False
+    async with _speaker_activity(uid, st.get("speaker")):
+        # `delay` относится только к следующему обычному сообщению/медиа стадии
+        # и всегда отрабатывает ДО него, никогда после.
+        await wait_before(st.get("delay", 0.0))
+        media_senders = {
+            "image": (bot.send_photo, "photo"),
+            "audio": (bot.send_audio, "audio"),
+            "video": (bot.send_video, "video"),
+            "document": (bot.send_document, "document"),
+        }
+        for field in ("image", "audio", "video", "document"):
+            raw_reference = st.get(field)
+            if not raw_reference:
+                continue
+            try:
+                spec = parse_media_spec(raw_reference)
+                actual_field = delivery_field(field, spec)
+            except ValueError as e:
+                print(T.MEDIA_SPEC_FAIL.format(field=field, value=raw_reference, err=e))
+                continue
+            sender, kind_label = media_senders[actual_field]
+            path = Path(spec.path) if Path(spec.path).is_absolute() else media_dir / spec.path
+            try:
+                if st.get("speaker") == "zhenya" and text:
+                    await _send_typewriter_media(sender, uid, path, text)
+                else:
+                    await sender(uid, FSInputFile(path), caption=text)
+                media_delivered = True
+                break
+            except Exception as e:
+                print(T.MEDIA_FAIL.format(kind=kind_label, path=path, err=e))
+        if text and not media_delivered:
+            if st.get("speaker") == "zhenya":
+                await _send_typewriter_text(uid, text)
+            else:
+                await bot.send_message(uid, text)
+
+    if st.get("mode") == "gate":
+        await _request_gate_approval(uid, stage_id)
 
 
 # ======================== HUB ===============================================
@@ -172,16 +342,46 @@ async def advance(uid: int) -> None:
 
 # ======================== answers & submissions =============================
 
+def _answer_display(message: Message, text: str) -> str:
+    value = (text or "").strip()
+    if value:
+        return value[:3000]
+    if message.photo:
+        return T.ANSWER_KIND_PHOTO
+    if message.document:
+        return T.ANSWER_KIND_DOCUMENT
+    if message.voice:
+        return T.ANSWER_KIND_VOICE
+    if message.video:
+        return T.ANSWER_KIND_VIDEO
+    return T.ANSWER_KIND_EMPTY
+
+
 async def _try_answer(uid: int, message: Message, text: str) -> None:
     player = db.get_player(uid)
     st = quest.get_stage(player["stage"]) if player else None
     if not st or st.get("mode") != "auto":
         return
-    if quest.validate(st.get("accept", []), text):
-        await message.answer(T.CORRECT)
+    answer = _answer_display(message, text)
+    db.log_event(uid, "answer_attempt", f"{player['stage']}: {answer[:500]}")
+    await notify_host(T.ANSWER_ATTEMPT_HOST.format(
+        name=_name(player), stage=player["stage"], answer=answer,
+    ))
+    accepted = [quest.entry_code()] if st.get("accept_entry_code") else st.get("accept", [])
+    if quest.validate(accepted, text):
+        correct_text = st.get("correct_text", T.CORRECT)
+        if correct_text:
+            await message.answer(correct_text)
         await advance(uid)
     else:
-        await message.answer(T.WRONG)
+        wrong_argus = st.get("wrong_argus")
+        if wrong_argus:
+            await send_timed_messages(
+                [{"speaker": "argus", "text": wrong_argus, "delay": 0}],
+                lambda line: message.answer(line),
+            )
+        else:
+            await message.answer(st.get("wrong_text", T.WRONG))
 
 
 async def _submit_for_approval(uid: int, message: Message) -> None:
@@ -208,6 +408,14 @@ async def _submit_for_approval(uid: int, message: Message) -> None:
     ]])
     caption = T.SUBMIT_RELAY.format(name=_name(player), stage=stage_id,
                                     payload=payload or "(нет)")
+    if cfg.HOST_CONSOLE:
+        _host_print(caption)
+        _host_print(f"HOST_CONSOLE=1 → авто-одобрение sub#{sub_id}")
+        db.set_submission_status(sub_id, "approved")
+        db.log_event(uid, "approved", f"sub#{sub_id} (console)")
+        await message.answer(T.APPROVED_TO_PLAYER)
+        await advance(uid)
+        return
     try:
         if kind in ("photo", "video") and file_id:
             if kind == "photo":
@@ -220,9 +428,9 @@ async def _submit_for_approval(uid: int, message: Message) -> None:
             await bot.send_document(cfg.HOST_ID, file_id, caption=caption,
                                     reply_markup=kb)
         else:
-            await bot.send_message(cfg.HOST_ID, caption, reply_markup=kb)
+            await send_host(caption, reply_markup=kb)
     except Exception as e:
-        await bot.send_message(cfg.HOST_ID, T.SUBMIT_RELAY_FAIL.format(
+        await send_host(T.SUBMIT_RELAY_FAIL.format(
             name=_name(player), stage=stage_id, err=e))
     await message.answer(T.SUBMIT_SENT)
 
@@ -232,90 +440,68 @@ async def _submit_for_approval(uid: int, message: Message) -> None:
 @dp.message(CommandStart())
 async def cmd_start(message: Message, command: CommandStart) -> None:
     uid = message.from_user.id
-    payload = (command.args or "").strip()
     player = db.get_player(uid)
+    if player is not None:
+        await message.answer(T.ALREADY_IN_QUEST)
+        return
 
-    if payload and payload == quest.entry_code():
-        if player is None:
-            db.register(uid, message.from_user.username or "",
-                        message.from_user.full_name, "start_gate")
-            db.log_event(uid, "register")
+    # Ключ из SIGame не тратится на вход: он понадобится Аргусу после пролога.
+    db.register(uid, message.from_user.username or "",
+                message.from_user.full_name, INTRO_STAGE)
+    db.log_event(uid, "register")
 
-            # Приветствие из YAML welcome
-            welcome = quest.welcome_info()
-            welcome_text = welcome.get("text", T.WELCOME)
-            welcome_image = welcome.get("image")
-            if welcome_image:
-                path = (Path(welcome_image) if Path(welcome_image).is_absolute()
-                        else BASE / "quest" / "images" / welcome_image)
-                try:
+    welcome = quest.welcome_info()
+    welcome_text = welcome.get("text", T.WELCOME)
+    welcome_image = welcome.get("image")
+    async with _speaker_activity(uid, welcome.get("speaker")):
+        await wait_before(welcome.get("delay", 0.0))
+        if welcome_image:
+            path = (Path(welcome_image) if Path(welcome_image).is_absolute()
+                    else BASE / "quest" / "images" / welcome_image)
+            try:
+                if welcome.get("speaker") == "zhenya":
+                    await _send_typewriter_media(bot.send_photo, uid, path, welcome_text)
+                else:
                     await bot.send_photo(uid, FSInputFile(path), caption=welcome_text)
-                except Exception:
+            except Exception:
+                if welcome.get("speaker") == "zhenya":
+                    await _send_typewriter_text(uid, welcome_text)
+                else:
                     await bot.send_message(uid, welcome_text)
-            else:
-                await bot.send_message(uid, welcome_text)
-
-            # Кнопки ведущему
-            name = message.from_user.full_name
-            username = message.from_user.username or "—"
-            kb = InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton("✅ Запустить", callback_data=f"gate_appr:{uid}"),
-                InlineKeyboardButton("❌ Отклонить", callback_data=f"gate_rej:{uid}"),
-            ]])
-            await notify_host(T.NEW_PLAYER_GATE.format(name=name, username=username))
-            await bot.send_message(
-                cfg.HOST_ID,
-                f"🆕 {name} (@{username}) ждёт старта.",
-                reply_markup=kb,
-            )
-            await send_stage(uid, "start_gate")
+        elif welcome.get("speaker") == "zhenya":
+            await _send_typewriter_text(uid, welcome_text)
         else:
-            await message.answer(T.ALREADY_IN_QUEST)
-        return
+            await bot.send_message(uid, welcome_text)
 
-    if not payload:
-        await message.answer(
-            T.ALREADY_IN_QUEST if player is not None else T.NEED_CODE)
-        return
-
-    if player is None:
-        await message.answer(T.NEED_CODE)
-        return
-    await _try_answer(uid, message, payload)
+    name = message.from_user.full_name
+    username = message.from_user.username or "—"
+    await notify_host(T.NEW_PLAYER_INTRO.format(name=name, username=username))
+    await send_stage(uid, INTRO_STAGE)
 
 
-# ======================== gate approve / reject =============================
+# ======================== host gate =========================================
 
-@dp.callback_query(F.data.startswith("gate_appr:"))
-async def cb_gate_approve(cq: CallbackQuery) -> None:
+@dp.callback_query(F.data.startswith("gate_accept:"))
+async def cb_gate_accept(cq: CallbackQuery) -> None:
     if cq.from_user.id != cfg.HOST_ID:
-        return await cq.answer(T.ONLY_HOST, show_alert=True)
-    uid = int(cq.data.split(":", 1)[1])
-    db.set_stage(uid, "prologue")
-    db.log_event(uid, "gate_approved")
-    await cq.answer("✅ Игрок запущен!")
+        await cq.answer(T.ONLY_HOST, show_alert=True)
+        return
+
+    _, raw_uid, stage_id = cq.data.split(":", 2)
+    uid = int(raw_uid)
+    player = db.get_player(uid)
+    stage = quest.get_stage(stage_id)
+    if not player or player["stage"] != stage_id or not stage or stage.get("mode") != "gate":
+        await cq.answer(T.GATE_ALREADY_RESOLVED, show_alert=True)
+        return
+
+    db.log_event(uid, "gate_approved", stage_id)
+    await cq.answer(T.GATE_ACCEPTED_ALERT)
     try:
         await cq.message.edit_reply_markup(reply_markup=None)
     except Exception:
         pass
-    await notify_host(T.GATE_APPROVED.format(uid=uid))
-    await send_stage(uid, "prologue")
-    await advance(uid)  # prologue -> hub
-
-
-@dp.callback_query(F.data.startswith("gate_rej:"))
-async def cb_gate_reject(cq: CallbackQuery) -> None:
-    if cq.from_user.id != cfg.HOST_ID:
-        return await cq.answer(T.ONLY_HOST, show_alert=True)
-    uid = int(cq.data.split(":", 1)[1])
-    db.log_event(uid, "gate_rejected")
-    await cq.answer("❌ Отклонён")
-    try:
-        await cq.message.edit_reply_markup(reply_markup=None)
-    except Exception:
-        pass
-    await bot.send_message(uid, T.GATE_REJECTED)
-    await notify_host(T.GATE_REJECTED_HOST.format(uid=uid))
+    await advance(uid)
 
 
 # ======================== node pick (hub buttons) ===========================
@@ -358,8 +544,6 @@ async def cmd_progress(message: Message) -> None:
     bal = p["banked"] or 0
     if p["finished_at"]:
         return await message.answer(T.PROGRESS_FINISHED.format(bal=bal))
-    if p["stage"] == "start_gate":
-        return await message.answer(T.PROGRESS_GATE)
     await message.answer(T.PROGRESS_STAGE_HEADER.format(stage=p["stage"], bal=bal))
     await send_stage(uid, p["stage"])
 
@@ -370,20 +554,25 @@ async def cmd_hint(message: Message) -> None:
     p = db.get_player(uid)
     if not p:
         return await message.answer(T.HINT_NEED_START)
-    if p["stage"] in ("start_gate", "hub"):
+    if p["stage"] == "hub":
         return await message.answer(T.NO_HINT_HERE)
     st = quest.get_stage(p["stage"])
-    hint = st.get("hint") if st else None
-    if not hint:
+    hints = stage_hints(st)
+    if not hints:
         return await message.answer(T.NO_HINT_HERE)
-    bal = p["banked"] or 0
-    if bal <= 0:
+    status, bal, hint_index = db.consume_hint(uid, p["stage"], len(hints))
+    if status == "exhausted":
+        return await message.answer(T.NO_MORE_HINTS)
+    if status == "no_balance":
         return await message.answer(T.NO_HINTS_LEFT)
-    db.add_banked(uid, -1)
-    bal -= 1
-    await message.answer(T.HINT_USED.format(hint=hint, remaining=bal))
+    await message.answer(T.HINT_USED.format(
+        hint=hints[hint_index], number=hint_index + 1, total=len(hints), remaining=bal,
+    ))
     if cfg.NOTIFY_HOST:
-        await notify_host(T.HINT_HOST.format(name=_name(p), stage=p["stage"], remaining=bal))
+        await notify_host(T.HINT_HOST.format(
+            name=_name(p), stage=p["stage"], number=hint_index + 1,
+            total=len(hints), remaining=bal,
+        ))
 
 
 @dp.message(Command("help"))
@@ -412,8 +601,6 @@ async def cmd_hub(message: Message) -> None:
         return await message.answer(T.NOT_IN_QUEST)
     if p["stage"] == "hub":
         await _send_hub(uid)
-    elif p["stage"] == "start_gate":
-        await message.answer(T.IN_GATE)
     else:
         await message.answer(T.NO_HUB_MID_NODE)
 
@@ -454,6 +641,23 @@ async def cb_rej(cq: CallbackQuery) -> None:
 
 # ======================== host commands =====================================
 
+@dp.message(HostFilter(), Command("update", "reload"))
+async def cmd_update(message: Message) -> None:
+    scenario_ok, scenario_details = quest.reload_from_disk()
+    if not scenario_ok:
+        return await message.answer(T.UPDATE_FAIL.format(error=scenario_details))
+
+    python_ok, python_details = validate_python_tree(BASE)
+    if not python_ok:
+        return await message.answer(T.UPDATE_FAIL.format(error=python_details))
+
+    await message.answer(T.UPDATE_RESTARTING.format(
+        details=f"{scenario_details}; {python_details}",
+    ))
+    await asyncio.sleep(0.8)  # дать Telegram доставить подтверждение до exec
+    restart_current_process()
+
+
 @dp.message(HostFilter(), Command("stats"))
 async def cmd_stats(message: Message) -> None:
     rows = db.all_players()
@@ -476,15 +680,24 @@ async def cmd_stats(message: Message) -> None:
 
 @dp.message(HostFilter(), Command("pending"))
 async def cmd_pending(message: Message) -> None:
-    rows = db.pending()
-    if not rows:
+    submissions = db.pending()
+    gates = _pending_gate_players()
+    if not submissions and not gates:
         return await message.answer(T.PENDING_EMPTY)
-    lines = [T.PENDING_HEADER]
-    for r in rows:
-        lines.append(T.PENDING_LINE.format(
-            sid=r["id"], name=r["name"], username=r["username"] or "—",
-            stage=r["stage"], payload=r["payload"] or r["kind"]))
-    await message.answer("\n".join(lines))
+
+    if submissions:
+        lines = [T.PENDING_HEADER]
+        for row in submissions:
+            lines.append(T.PENDING_LINE.format(
+                sid=row["id"], name=row["name"], username=row["username"] or "—",
+                stage=row["stage"], payload=row["payload"] or row["kind"]))
+        await message.answer("\n".join(lines))
+
+    for player, stage_id in gates:
+        await message.answer(
+            T.PENDING_GATE_LINE.format(name=_name(player), stage=stage_id),
+            reply_markup=_gate_keyboard(player["user_id"], stage_id),
+        )
 
 
 @dp.message(HostFilter(), Command("addhint"))
@@ -535,13 +748,37 @@ async def cmd_setstage(message: Message, command: Command) -> None:
     args = (command.args or "").split()
     if len(args) < 2:
         return await message.answer(T.SETSTAGE_USAGE)
-    uid, stage = int(args[0]), args[1]
+    uid = _resolve(args[0])
+    if not uid:
+        return await message.answer(T.PLAYER_NOT_FOUND)
+    stage = args[1]
     if not quest.get_stage(stage):
         return await message.answer(T.STAGE_NOT_FOUND.format(stage=stage))
     db.set_stage(uid, stage)
     await send_stage(uid, stage)
-    await advance(uid)
+    if quest.is_info(stage):
+        await advance(uid)
     await message.answer(T.SETSTAGE_RESULT.format(uid=uid, stage=stage))
+
+
+@dp.message(HostFilter(), Command("msg", "message", "m"))
+async def cmd_message_player(message: Message, command: Command) -> None:
+    args = (command.args or "").split(maxsplit=1)
+    if len(args) < 2:
+        return await message.answer(T.HOST_MESSAGE_USAGE)
+    target = _resolve(args[0])
+    if not target:
+        return await message.answer(T.PLAYER_NOT_FOUND)
+    text = args[1].strip()
+    if not text:
+        return await message.answer(T.HOST_MESSAGE_USAGE)
+    player = db.get_player(target)
+    try:
+        await bot.send_message(target, T.HOST_MESSAGE_PLAYER.format(text=text))
+    except Exception as error:
+        return await message.answer(T.HOST_MESSAGE_FAIL.format(err=error))
+    db.log_event(target, "host_message", text[:500])
+    await message.answer(T.HOST_MESSAGE_SENT.format(name=_name(player)))
 
 
 @dp.message(HostFilter(), Command("broadcast"))
@@ -564,9 +801,12 @@ async def cmd_reset(message: Message, command: Command) -> None:
     args = (command.args or "").split()
     if not args:
         return await message.answer(T.RESET_USAGE)
-    uid = int(args[0])
-    db.set_stage(uid, "start_gate")
-    await message.answer(T.RESET_DONE.format(uid=uid, stage="start_gate"))
+    uid = _resolve(args[0])
+    if not uid:
+        return await message.answer(T.PLAYER_NOT_FOUND)
+    db.set_stage(uid, INTRO_STAGE)
+    db.reset_hint_usage(uid)
+    await message.answer(T.RESET_DONE.format(uid=uid, stage=INTRO_STAGE))
 
 
 @dp.message(HostFilter(), Command("approve"))
@@ -614,10 +854,6 @@ async def on_message(message: Message) -> None:
         await message.answer(T.START_FIRST)
         return
 
-    if player["stage"] == "start_gate":
-        await message.answer(T.IN_GATE)
-        return
-
     if player["stage"] == "hub":
         await message.answer(T.IN_HUB_USE_BUTTONS)
         return
@@ -644,9 +880,16 @@ async def on_message(message: Message) -> None:
 
 async def main() -> None:
     db.init_db()
+    # Старые тестовые БД могли сохранить гейт до пролога. После переноса гейта
+    # возвращаем таких игроков на первую задачу Жени.
+    for player in db.all_players():
+        if player["stage"] == "start_gate":
+            db.set_stage(player["user_id"], INTRO_STAGE)
+            db.log_event(player["user_id"], "stage_migrated", "start_gate -> z_1")
     await bot.delete_webhook(drop_pending_updates=True)
     me = await bot.get_me()
-    print(T.STARTUP.format(username=me.username, host=cfg.HOST_ID))
+    extra = " HOST_CONSOLE=1 (уведомления → консоль, гейты → авто)" if cfg.HOST_CONSOLE else ""
+    print(T.STARTUP.format(username=me.username, host=cfg.HOST_ID) + extra)
     await dp.start_polling(bot)
 
 

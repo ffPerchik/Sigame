@@ -1,0 +1,113 @@
+"""Крипто-примитивы квеста (русский алфавит без Ё, 32 буквы)."""
+from __future__ import annotations
+
+RU = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
+RU_WITH_YO = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
+assert len(RU) == 32
+assert len(RU_WITH_YO) == 33
+
+
+def only_ru(s: str) -> str:
+    return "".join(ch for ch in s.upper().replace("Ё", "Е") if ch in RU)
+
+
+def a1z26_encode(text: str) -> str:
+    return "-".join(f"{RU.index(ch) + 1:02d}" for ch in only_ru(text))
+
+
+def a1z26_decode(nums: str) -> str:
+    out = []
+    for part in nums.replace(",", " ").replace("-", " ").split():
+        out.append(RU[int(part) - 1])
+    return "".join(out)
+
+
+def caesar(text: str, shift: int) -> str:
+    out = []
+    for ch in text:
+        up = ch.upper().replace("Ё", "Е")
+        if up in RU:
+            i = (RU.index(up) + shift) % 32
+            out.append(RU[i] if ch.isupper() or ch in RU else RU[i].lower())
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def atbash(text: str) -> str:
+    out = []
+    for ch in text:
+        up = ch.upper().replace("Ё", "Е")
+        if up in RU:
+            out.append(RU[31 - RU.index(up)])
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def vigenere(text: str, key: str, decrypt: bool = False, alphabet: str = RU) -> str:
+    """Виженер с выбираемым алфавитом; по умолчанию прежние 32 буквы без Ё."""
+    def normalize(ch: str) -> str:
+        up = ch.upper()
+        return "Е" if up == "Ё" and "Ё" not in alphabet else up
+
+    normalized_key = "".join(normalize(ch) for ch in key if normalize(ch) in alphabet)
+    ki = 0
+    out = []
+    for ch in text:
+        up = normalize(ch)
+        if up not in alphabet:
+            out.append(ch)
+            continue
+        shift = alphabet.index(normalized_key[ki % len(normalized_key)])
+        if decrypt:
+            shift = -shift
+        out.append(alphabet[(alphabet.index(up) + shift) % len(alphabet)])
+        ki += 1
+    return "".join(out)
+
+
+def rail_fence_enc(text: str, rails: int = 3) -> str:
+    text = only_ru(text)
+    fence = [[] for _ in range(rails)]
+    rail, d = 0, 1
+    for ch in text:
+        fence[rail].append(ch)
+        rail += d
+        if rail == 0 or rail == rails - 1:
+            d *= -1
+    return "".join("".join(r) for r in fence)
+
+
+def rail_fence_dec(cipher: str, rails: int = 3) -> str:
+    cipher = only_ru(cipher)
+    n = len(cipher)
+    pattern = []
+    rail, d = 0, 1
+    for _ in range(n):
+        pattern.append(rail)
+        rail += d
+        if rail == 0 or rail == rails - 1:
+            d *= -1
+    counts = [pattern.count(r) for r in range(rails)]
+    chunks, i = [], 0
+    for c in counts:
+        chunks.append(list(cipher[i:i + c]))
+        i += c
+    out = []
+    for r in pattern:
+        out.append(chunks[r].pop(0))
+    return "".join(out)
+
+
+# Масонский / pigpen: две решётки 3×3 (прямая и ромбическая),
+# каждая без точки и с точкой; из 36 позиций используются первые 32.
+PIGPEN_ORDER = RU  # индекс → глиф
+
+
+def pigpen_cell(idx: int) -> tuple[str, bool, int]:
+    """Тип решётки, наличие точки и позиция клетки 0…8."""
+    group, pos = divmod(idx, 9)
+    dotted = group % 2 == 1
+    kind = "box" if group in (0, 1) else "x"
+    return kind, dotted, pos
