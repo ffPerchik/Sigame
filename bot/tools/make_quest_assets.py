@@ -12,13 +12,13 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 try:
     from .quest_crypto import (
-        RU, RU_WITH_YO, a1z26_encode, atbash, only_ru, pigpen_cell,
-        rail_fence_enc, vigenere,
+        RU, RU_WITH_YO, a1z26_encode, atbash, braille_encode, only_ru,
+        pigpen_cell, rail_fence_enc, vigenere, wrong_layout_to_ru,
     )
 except ImportError:  # запуск как `python bot/tools/make_quest_assets.py`
     from quest_crypto import (
-        RU, RU_WITH_YO, a1z26_encode, atbash, only_ru, pigpen_cell,
-        rail_fence_enc, vigenere,
+        RU, RU_WITH_YO, a1z26_encode, atbash, braille_encode, only_ru,
+        pigpen_cell, rail_fence_enc, vigenere, wrong_layout_to_ru,
     )
 
 BOT_ROOT = Path(__file__).resolve().parent.parent
@@ -59,6 +59,18 @@ def script_font(size: int) -> ImageFont.FreeTypeFont:
     if not SCRIPT_FONT.exists():
         raise FileNotFoundError(f"Нет каллиграфического шрифта: {SCRIPT_FONT}")
     return ImageFont.truetype(str(SCRIPT_FONT), size)
+
+
+def mono_font(size: int) -> ImageFont.FreeTypeFont:
+    """Моноширинный шрифт из репо — нужен для символьных сеток (решётка Кардано)."""
+    candidates = [
+        BOT_ROOT / "tools" / "fonts" / "DejaVuSansMono-Bold.ttf",
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"),
+    ]
+    for p in candidates:
+        if p.exists():
+            return ImageFont.truetype(str(p), size)
+    raise FileNotFoundError("Нет моноширинного шрифта с кириллицей")
 
 
 def parchment_page(source: Path = PARCHMENT_SOURCE) -> Image.Image:
@@ -967,38 +979,140 @@ def make_n5():
 
 
 # ===================================================================== N6
+# Узел «ТАЙНИК»: четыре носителя (бумага, видео, пластина, записка) и четыре
+# новых приёма (решётка Кардано, чужая раскладка, брайль, акростих).
+N6_LETTER_LINES = [
+    "если ты читаешь это",
+    "я успел собрать сейф",
+    "вниз под полосой",
+    "не верь аргусу он врёт",
+    "держи этот лист твёрдо",
+    "проверь раму окна",
+    "ключи и шкафы",
+    "и не ищи меня в сети",
+]
+# (строка, колонка) дырок решётки; чтение по порядку строк даёт ТИТРЫ.
+N6_GRILLE_HOLES = [(1, 13), (2, 2), (4, 7), (5, 1), (6, 12)]
+# Субтитр в ролике набран в физической раскладке QWERTY; в ЙЦУКЕН это ТОЧКИ.
+N6_LAYOUT_CAPTION = "njxrb"
+N6_NOTE_LINES = [
+    "Жди. Я вернусь, когда аргус отвлечётся.",
+    "Если что-то пошло не так —",
+    "Не ищи меня в сети.",
+    "Я оставил всё, что нужно.",
+    "Жив. Просто прячусь.",
+    "Иначе он доберётся до нас обоих.",
+    "Всё будет хорошо.",
+]
+
+
+def _grille_extract(lines, holes):
+    return "".join(lines[r][c] for r, c in sorted(holes))
+
+
 def make_n6():
-    """Атбаш → изгородь → Виженер с ключом из шага 1 → ПОРТАЛ."""
-    step1_plain = "АТБАШ"
-    step1_c = atbash(step1_plain)  # they see cipher, decode with atbash
+    """Тайник Жени: письмо+плёнка (Кардано), ролик (раскладка), брайль, акростих."""
+    assert _grille_extract(N6_LETTER_LINES, N6_GRILLE_HOLES).upper() == "ТИТРЫ"
+    assert wrong_layout_to_ru(N6_LAYOUT_CAPTION) == "точки"
+    assert "".join(line[0] for line in N6_NOTE_LINES) == "ЖЕНЯЖИВ"
 
-    rail_plain = "ВИЖНЕР"
-    rail_c = rail_fence_enc(rail_plain, 3)
+    w, h = 1000, 700
+    mono = mono_font(30)
+    cw = mono.getlength("ММММ") / 4
+    x0, y0, line_h = 60, 160, 54
 
-    vig_plain = "ПОРТАЛ"
-    vig_c = vigenere(vig_plain, "АТБАШ")
+    # --- письмо (бумага) ---
+    letter = Image.new("RGB", (w, h), (236, 230, 212))
+    d = ImageDraw.Draw(letter)
+    d.text((x0, 40), "НЕ ОТПРАВЛЕНО", fill=(160, 50, 45), font=font(28))
+    d.text((x0, 90), "черновик · монитор k@ly$%ev", fill=(120, 110, 90), font=font(20))
+    for r, line in enumerate(N6_LETTER_LINES):
+        for c, ch in enumerate(line):
+            d.text((x0 + c * cw, y0 + r * line_h), ch, fill=(35, 32, 40), font=mono)
+    for mx, my in ((24, 24), (w - 44, 24), (24, h - 44)):
+        d.rectangle((mx, my, mx + 20, my + 20), fill=(30, 30, 30))
+    text_rect = (40, 120, w - 40, y0 + len(N6_LETTER_LINES) * line_h + 16)
+    hack_glitch(letter, seed=61, keep_rect=text_rect, power=0.7).save(
+        OUT / "artifact_6a.png"
+    )
 
-    # also A1Z26 line as first visible hook
-    nums = a1z26_encode(step1_c)
+    # --- обгоревшая плёнка с дырками (решётка Кардано) ---
+    film = Image.new("RGB", (w, h), (12, 12, 14))
+    d = ImageDraw.Draw(film)
+    for r, c in N6_GRILLE_HOLES:
+        cx, cy = x0 + c * cw + cw / 2, y0 + r * line_h + 20
+        d.ellipse((cx - cw * 0.75, cy - 24, cx + cw * 0.75, cy + 24), fill=(236, 230, 212))
+        d.ellipse(
+            (cx - cw * 0.75 - 5, cy - 29, cx + cw * 0.75 + 5, cy + 29),
+            outline=(70, 60, 50), width=5,
+        )
+    for mx, my in ((24, 24), (w - 44, 24), (24, h - 44)):
+        d.rectangle((mx, my, mx + 20, my + 20), fill=(230, 230, 230))
+    hack_glitch(film, seed=62, power=0.8).save(OUT / "artifact_6b.png")
+    print(f"  N6  grille holes → {_grille_extract(N6_LETTER_LINES, N6_GRILLE_HOLES)}")
 
-    img = Image.new("RGB", (1100, 780), (18, 18, 22))
-    d = ImageDraw.Draw(img)
-    d.text((36, 24), "ПОСЛЕДНИЙ ЗАМОК · четыре щеколды", fill=(220, 200, 140), font=font(28))
-    d.text((36, 90), "I  A1Z26  (А=01 … Я=32)", fill=(140, 140, 150), font=font(22))
-    d.text((36, 130), nums, fill=(240, 240, 245), font=font(40))
-    d.text((36, 210), "II  то, что получилось — пропусти через зеркало алфавита", fill=(140, 140, 150), font=font(22))
-    d.text((36, 280), "III  затем — три рельса, зигзаг", fill=(140, 140, 150), font=font(22))
-    d.text((36, 320), rail_c, fill=(240, 240, 245), font=font(48))
-    d.text((36, 410), "IV  Виженер. Ключ — слово из щеколды II.", fill=(140, 140, 150), font=font(22))
-    d.text((36, 460), vig_c, fill=(240, 220, 120), font=font(56))
-    d.text((36, 560), "Алфавит везде один: 32 буквы, без Ё.", fill=(110, 110, 120), font=font(20))
-    # null cipher telestich as extra confirmation of ПОРТАЛ? skip to not leak
-    img.save(OUT / "artifact_6a.png")
+    # --- ролик с монитора: субтитр в чужой раскладке ---
+    exe = ffmpeg()
+    frames_dir = OUT / "_n6_frames"
+    frames_dir.mkdir(exist_ok=True)
+    vw, vh = 960, 540
+    n_frames = 40
+    for i in range(n_frames):
+        img = Image.new("RGB", (vw, vh), (16, 18, 24))
+        d = ImageDraw.Draw(img)
+        d.text((24, 16), f"REC  00:00:{i:02d}", fill=(180, 40, 40), font=font(22))
+        d.text((vw - 320, 16), "захват · монитор k@ly$%ev", fill=(110, 110, 120), font=font(18))
+        d.rectangle((60, 80, vw - 60, vh - 120), outline=(70, 74, 86), width=2)
+        d.text((80, 96), "блокнот — без названия", fill=(150, 150, 160), font=font(20))
+        if i % 2 == 0:  # мигающий курсор
+            d.rectangle((84, 150, 96, 178), fill=(220, 220, 225))
+        if i >= 16:
+            d.text((250, vh - 90), N6_LAYOUT_CAPTION, fill=(215, 215, 220), font=font(36))
+            d.text((250, vh - 44), "субтитры: авто", fill=(100, 100, 110), font=font(16))
+        hack_glitch(img, seed=63 + i).save(frames_dir / f"f{i:03d}.png")
 
-    print(f"  N6  A1Z26 of atbash(АТБАШ)={step1_c} → {nums}")
-    print(f"  N6  atbash → {step1_plain}")
-    print(f"  N6  rail {rail_c} → {rail_plain}")
-    print(f"  N6  vig({step1_plain}) {vig_c} → {vig_plain}")
+    Image.open(frames_dir / "f020.png").save(OUT / "artifact_6d.png")
+    if exe:
+        cmd = [
+            exe, "-y", "-hide_banner", "-loglevel", "error",
+            "-framerate", "6", "-i", str(frames_dir / "f%03d.png"),
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", str(OUT / "artifact_6c.mp4"),
+        ]
+        subprocess.run(cmd, check=True, timeout=60)
+        print(f"  N6  video caption {N6_LAYOUT_CAPTION} → {wrong_layout_to_ru(N6_LAYOUT_CAPTION)}")
+    else:
+        print("  N6  ⚠ нет ffmpeg, только кадры")
+
+    # --- пластина с брайлем ---
+    from PIL.PngImagePlugin import PngInfo
+
+    pw, ph = 980, 380
+    plate = Image.new("RGB", (pw, ph), (26, 28, 34))
+    d = ImageDraw.Draw(plate)
+    d.text((32, 24), "ПЛАСТИНА · дубль на ощупь", fill=(150, 150, 160), font=font(24))
+    cells = braille_encode("СТРОКИ")
+    for idx, cell in enumerate(cells):
+        bx = 60 + idx * 150
+        by = 140
+        dots = {int(v) for v in cell}
+        for dot in range(1, 7):
+            dx = bx + (0 if dot in (1, 2, 3) else 56)
+            dy = by + {1: 0, 2: 52, 3: 104, 4: 0, 5: 52, 6: 104}[dot]
+            if dot in dots:
+                d.ellipse((dx, dy, dx + 34, dy + 34), fill=(226, 222, 208))
+                d.ellipse((dx + 6, dy + 6, dx + 18, dy + 18), fill=(250, 248, 240))
+            else:
+                d.ellipse((dx, dy, dx + 34, dy + 34), outline=(60, 62, 70), width=2)
+    meta = PngInfo()
+    meta.add_text("note", "точки — это буквы. считай, не смотри.")
+    hack_glitch(plate, seed=64, power=0.5).save(OUT / "artifact_6e.png", pnginfo=meta)
+    print(f"  N6  braille cells {' '.join(cells)} → СТРОКИ")
+
+    # --- записка-акростих ---
+    (OUT / "artifact_6f.txt").write_text(
+        "\n".join(N6_NOTE_LINES) + "\n", encoding="utf-8"
+    )
+    print("  N6  note acrostic → ЖЕНЯ ЖИВ")
 
 
 def write_readme():

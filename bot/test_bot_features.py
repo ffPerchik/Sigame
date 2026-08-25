@@ -45,7 +45,7 @@ class HintSequenceTests(unittest.TestCase):
     def test_no_balance_and_reset_are_handled(self):
         self.assertEqual(db.consume_hint(42, "N4_signs", 1), ("ok", 1, 0))
         self.assertEqual(db.consume_hint(42, "N5_bin", 1), ("ok", 0, 0))
-        self.assertEqual(db.consume_hint(42, "N6_a1", 1), ("no_balance", 0, 0))
+        self.assertEqual(db.consume_hint(42, "N6_grille", 1), ("no_balance", 0, 0))
 
         db.set_banked(42, 1)
         db.reset_hint_usage(42)

@@ -9,7 +9,12 @@ bot/.env
 bot/quest.db
 bot/qr/
 bot/quest/images/_n4_frames/
+bot/quest/images/_n6_frames/
 bot/__pycache__/
+
+# local virtualenvs
+.venv/
+.venv-*/
 
 # generated achievement reports
 *-achievements.txt

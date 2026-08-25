@@ -13,7 +13,8 @@ class NonSpoilerMetadataTests(unittest.TestCase):
         "artifact_3a.png", "artifact_3b.png", "artifact_3c.png", "artifact_3d.png",
         "artifact_4a.mp4", "artifact_4b.png", "artifact_4c.png",
         "artifact_5a.png", "artifact_5b.html", "artifact_5c.png",
-        "artifact_6a.png",
+        "artifact_6a.png", "artifact_6b.png", "artifact_6c.mp4",
+        "artifact_6d.png", "artifact_6e.png", "artifact_6f.txt",
     )
     OLD_NAMES = (
         "n2_reversed.wav", "n2_fibo.wav", "n2_cipher.wav",

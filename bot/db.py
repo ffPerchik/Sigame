@@ -102,6 +102,17 @@ def count_nodes_done(user_id: int) -> int:
     return sum(1 for v in nodes_status(user_id).values() if v == "done")
 
 
+FINAL_NODE = "N6"
+PREREQUISITE_NODES = ("N1", "N2", "N3", "N4", "N5")
+
+
+def is_node_unlocked(node_id: str, status: dict) -> bool:
+    """Финальный узел даётся только после первых пяти; остальные открыты всегда."""
+    if node_id != FINAL_NODE:
+        return True
+    return all(status.get(n) == "done" for n in PREREQUISITE_NODES)
+
+
 # ---- игроки ----------------------------------------------------------------
 
 def register(user_id: int, username: str, name: str, stage: str) -> None:
