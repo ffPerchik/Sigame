@@ -74,7 +74,7 @@ python bot/tools/sigame_achievements.py path/to/game-log.txt
 ## Квест после входа
 
 Telegram-бот (`bot/`), хаб на 6 узлов: порядок 1–5 любой, шестой («Тайник»)
-открывается после первых пяти. В каждом узле несколько слоёв
+появляется в хабе как финал после первых пяти. В каждом узле несколько слоёв
 (LSB, Морзе, Виженер, книжный шифр, спектр, HTML-исходник и т.д.).
 Сценарий: `bot/quest/stages.yaml`. Разгадка для ведущего: `bot/docs/QUEST_WALKTHROUGH.md`.
 Ассеты: `python3 bot/tools/make_quest_assets.py`.

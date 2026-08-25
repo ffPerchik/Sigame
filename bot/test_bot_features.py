@@ -61,7 +61,7 @@ class HostFeatureWiringTests(unittest.TestCase):
         self.source = (REPO_ROOT / "bot" / "bot.py").read_text(encoding="utf-8")
 
     def test_direct_messages_and_answer_relay_are_wired(self):
-        self.assertIn('Command("msg", "message")', self.source)
+        self.assertIn('Command("msg", "message", "m")', self.source)
         self.assertIn("HOST_MESSAGE_PLAYER", self.source)
         self.assertIn("ANSWER_ATTEMPT_HOST", self.source)
         self.assertIn('db.log_event(uid, "answer_attempt"', self.source)

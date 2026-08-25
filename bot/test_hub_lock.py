@@ -75,9 +75,9 @@ class HubLockTests(unittest.TestCase):
         asyncio.run(run())
         return sent
 
-    def test_hub_hides_n6_button_until_prereqs_done(self):
+    def test_hub_hides_n6_entirely_until_prereqs_done(self):
         sent = self._render_hub()
-        self.assertIn("🔒  6. ТАЙНИК", sent["text"])
+        self.assertNotIn("ТАЙНИК", sent["text"])
         buttons = [
             b.callback_data
             for row in sent["kb"].inline_keyboard
@@ -89,13 +89,14 @@ class HubLockTests(unittest.TestCase):
         for node in db.PREREQUISITE_NODES:
             db.mark_node_done(42, node)
         sent = self._render_hub()
+        self.assertIn("★  6. ТАЙНИК", sent["text"])
+        self.assertIn(texts.HUB_LINE_FINAL.split("{")[0].strip(), sent["text"])
         buttons = [
             b.callback_data
             for row in sent["kb"].inline_keyboard
             for b in row
         ]
         self.assertIn("node:N6", buttons)
-        self.assertNotIn("🔒", sent["text"])
 
 
 if __name__ == "__main__":
