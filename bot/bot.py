@@ -280,8 +280,10 @@ async def _send_hub(uid: int) -> None:
         n = nid[1:]
         if status[nid] == "done":
             tmpl = T.HUB_LINE_DONE
-        elif not db.is_node_unlocked(nid, status):
+        elif db.is_node_hidden(nid, status):
             continue  # финал скрыт, пока не пройдены первые пять
+        elif not db.is_node_unlocked(nid, status):
+            tmpl = T.HUB_LINE_LOCKED
         elif nid == db.FINAL_NODE:
             tmpl = T.HUB_LINE_FINAL
         else:

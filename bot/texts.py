@@ -54,7 +54,7 @@ IN_HUB_USE_BUTTONS = "Выбери узел кнопками под сообще
 # ============ УЗЛЫ ============
 NODE_ALREADY_DONE = "Этот узел уже пройден ✅"
 NODE_NOT_FOUND = "Этот узел не найден в квесте."
-NODE_LOCKED = "🔒 Узел {node} откроется, когда будут пройдены узлы 1–5."
+NODE_LOCKED = "🔒 Узел {node} пока закрыт."
 NODE_PICK_OK = "→ загружаю {node}…"
 NODE_LABELS = {
     "N1": "СЛОИ СНИМКА",
@@ -174,6 +174,7 @@ HUB_HEADER = (
 )
 HUB_LINE_DONE = "  ▰  {n}. {label}    ·  {hint}  ·  пройден"
 HUB_LINE_TODO = "  ▱  {n}. {label}    ·  {hint}  ·  не начат"
+HUB_LINE_LOCKED = "  🔒  {n}. {label}    ·  {hint}  ·  закрыт"
 HUB_LINE_FINAL = "  ★  {n}. {label}    ·  {hint}  ·  финал открыт"
 HUB_FOOTER = "\n└  пройдено: {done}/6\n\nНажми кнопку с номером узла, чтобы войти."
 HUB_DONE_NOTICE = "Все шесть фрагментов собраны. Аргус замолкает."

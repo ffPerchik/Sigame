@@ -31,7 +31,10 @@ class HubLockTests(unittest.TestCase):
     def test_prerequisite_nodes_always_unlocked(self):
         status = db.nodes_status(42)
         for node in db.PREREQUISITE_NODES:
-            self.assertTrue(db.is_node_unlocked(node, status))
+            if node in db.LOCKED_VISIBLE_NODES:
+                self.assertFalse(db.is_node_unlocked(node, status))
+            else:
+                self.assertTrue(db.is_node_unlocked(node, status))
 
     def test_n6_stays_locked_until_all_five_done(self):
         for node in ("N1", "N2", "N3", "N4"):
@@ -45,7 +48,10 @@ class HubLockTests(unittest.TestCase):
             botmod.node_pick_block(42, "N6"),
             texts.NODE_LOCKED.format(node="N6"),
         )
-        # любой из первых пяти входить не мешает
+        self.assertEqual(
+            botmod.node_pick_block(42, "N4"),
+            texts.NODE_LOCKED.format(node="N4"),
+        )
         self.assertIsNone(botmod.node_pick_block(42, "N3"))
 
     def test_node_pick_block_allows_n6_after_prereqs(self):
@@ -84,7 +90,9 @@ class HubLockTests(unittest.TestCase):
             for b in row
         ]
         self.assertNotIn("node:N6", buttons)
+        self.assertNotIn("node:N4", buttons)
         self.assertIn("node:N3", buttons)
+        self.assertIn("🔒  4. ОДИН КАДР", sent["text"])
 
         for node in db.PREREQUISITE_NODES:
             db.mark_node_done(42, node)
