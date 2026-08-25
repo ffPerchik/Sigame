@@ -84,8 +84,10 @@ class N3CardStyleTests(unittest.TestCase):
         n3 = source.split("def make_n3():", 1)[1].split("# ===================================================================== N4", 1)[0]
         self.assertIn('header_key = "ФАСОТР"', n3)
         self.assertIn("sorted(header_key) == sorted(keyword)", n3)
+        self.assertIn("sort_order == [3, 5, 6, 4, 1, 2]", n3)
         self.assertIn('answer4 = "ИСТИНА"', n3)
-        self.assertIn("header_key.index(letter) + 1", n3)
+        self.assertIn("sort_order.index(row) + 1", n3)
+        self.assertIn('[(4, 3), (5, 4), (5, 1), (4, 1), (4, 5), (5, 6)]', n3)
         self.assertIn("верхний ряд сбился с порядка", n3)
         self.assertIn("третье слово знает, как его вернуть", n3)
         self.assertIn("язык первого листа ещё нужен", n3)

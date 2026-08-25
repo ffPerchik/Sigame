@@ -665,16 +665,21 @@ def make_n3():
         polybius_pairs.append(f"{index // 6 + 1}{index % 6 + 1}")
     assert len(polybius_alphabet) == 33
     assert polybius_pairs == ["43", "14", "11", "41", "45", "16"]
-    # Финал: шапка — перемешанная СТРОФА языком листа I.
-    # Сортировка букв в порядок СТРОФА даёт столбцы по строкам 1…6 → ИСТИНА.
+    # Финал: шапка — перемешанная СТРОФА. Сортировка даёт 356412.
+    # Первая цифра пар листа III меняется на место этой цифры в 356412.
     keyword = polybius_plain
     header_key = "ФАСОТР"
     assert sorted(header_key) == sorted(keyword)
     assert header_key != keyword
+    sort_order = [header_key.index(letter) + 1 for letter in keyword]
+    assert sort_order == [3, 5, 6, 4, 1, 2]
     answer4 = "ИСТИНА"
-    picks = [(index + 1, header_key.index(letter) + 1) for index, letter in enumerate(keyword)]
-    assert picks == [(1, 3), (2, 5), (3, 6), (4, 4), (5, 1), (6, 2)]
-    assert len(picks) == len(answer4) == 6
+    picks = []
+    for pair in polybius_pairs:
+        row, column = int(pair[0]), int(pair[1])
+        picks.append((sort_order.index(row) + 1, column))
+    assert picks == [(4, 3), (5, 4), (5, 1), (4, 1), (4, 5), (5, 6)]
+    assert len(set(picks)) == len(picks) == len(answer4) == 6
     grid_letters = [[""] * 6 for _ in range(6)]
     for (row, column), letter in zip(picks, answer4):
         grid_letters[row - 1][column - 1] = letter
@@ -867,7 +872,7 @@ def make_n3():
     print(f"  N3  pigpen {word1}; crib {crib}")
     print(f"  N3  rail {rail_plain} → {rail_c}")
     print(f"  N3  polybius key={word1} {polybius_plain} → {' '.join(polybius_pairs)}")
-    print(f"  N3  pigpen-grid header={header_key} sort={keyword} {picks} → {''.join(got)}")
+    print(f"  N3  pigpen-grid header={header_key} sort={sort_order} {polybius_pairs} → {picks} → {''.join(got)}")
 
 
 # ===================================================================== N4
