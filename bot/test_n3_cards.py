@@ -82,13 +82,14 @@ class N3CardStyleTests(unittest.TestCase):
     def test_final_sheet_uses_all_three_previous_answers(self):
         source = (REPO_ROOT / "bot" / "tools" / "make_quest_assets.py").read_text(encoding="utf-8")
         n3 = source.split("def make_n3():", 1)[1].split("# ===================================================================== N4", 1)[0]
-        self.assertIn("РЕШЕТКА = 6×6 слов", n3)
-        self.assertIn("ПОЛИБИЙ = строка.столбец", n3)
-        self.assertIn("СТРОФА = материал", n3)
-        self.assertIn("assert all(len(line.split()) == 6 for line in stanza)", n3)
+        self.assertIn('unique_key == "РЕШТКА"', n3)
+        self.assertIn('answer4 = "ИСТИНА"', n3)
         self.assertIn("picks = [(int(pair[0]), int(pair[1])) for pair in polybius_pairs]", n3)
-        self.assertIn("шесть пар с прошлого листа ещё не закончили путь", n3)
-        self.assertNotIn('centered_text(draw, coordinates', n3)
+        self.assertIn("столбцы помнят первое слово", n3)
+        self.assertIn("язык первого листа ещё нужен", n3)
+        self.assertIn("draw_pigpen(", n3.split("page4 = parchment_page")[1])
+        self.assertNotIn("шесть пар с прошлого листа ещё не закончили путь", n3)
+        self.assertNotIn("Тихий ветер гасит свет пряча архив", n3)
 
     def test_reference_and_open_font_are_bundled(self):
         source_dir = REPO_ROOT / "bot" / "quest" / "source"
