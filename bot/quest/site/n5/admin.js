@@ -5,6 +5,7 @@ const loginCard = document.querySelector('#login-card');
 const dashboard = document.querySelector('#dashboard');
 const digits = Array.from(document.querySelectorAll('.digit'));
 const result = document.querySelector('#result');
+const botCode = document.querySelector('#bot-code');
 
 const normalize = value => (value || '')
   .toLowerCase()
@@ -31,7 +32,9 @@ function enter() {
 }
 
 function closeNode() {
-  if (lockCode() === '6355') {
+  if (lockCode() === '6535') {
+    const code = lockCode();
+    botCode.textContent = 'АКТ-205';
     result.classList.remove('hidden');
   } else {
     result.classList.add('hidden');
