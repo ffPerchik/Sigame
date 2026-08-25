@@ -665,12 +665,15 @@ def make_n3():
         polybius_pairs.append(f"{index // 6 + 1}{index % 6 + 1}")
     assert len(polybius_alphabet) == 33
     assert polybius_pairs == ["43", "14", "11", "41", "45", "16"]
-    # Финал: язык листа I в клетках, первое слово подписывает столбцы,
-    # пары листа III выбирают знаки. Pigpen этих клеток → ИСТИНА.
-    unique_key = "".join(dict.fromkeys(word1))
-    assert unique_key == "РЕШТКА"
+    # Финал: шапка — перемешанная СТРОФА языком листа I.
+    # Сортировка букв в порядок СТРОФА даёт столбцы по строкам 1…6 → ИСТИНА.
+    keyword = polybius_plain
+    header_key = "ФАСОТР"
+    assert sorted(header_key) == sorted(keyword)
+    assert header_key != keyword
     answer4 = "ИСТИНА"
-    picks = [(int(pair[0]), int(pair[1])) for pair in polybius_pairs]
+    picks = [(index + 1, header_key.index(letter) + 1) for index, letter in enumerate(keyword)]
+    assert picks == [(1, 3), (2, 5), (3, 6), (4, 4), (5, 1), (6, 2)]
     assert len(picks) == len(answer4) == 6
     grid_letters = [[""] * 6 for _ in range(6)]
     for (row, column), letter in zip(picks, answer4):
@@ -809,14 +812,14 @@ def make_n3():
     centered_text(draw, "  ".join(polybius_pairs), 1035, script_font(82), accent)
     page3.save(OUT / "artifact_3c.png", optimize=True)
 
-    # Лист IV: решётка на языке листа I. Столбцы — уникальные буквы РЕШЕТКА.
+    # Лист IV: шапка — перемешанная СТРОФА. Сортировка даёт координаты.
     page4 = parchment_page(PARCHMENT_SOURCE_4)
     draw = ImageDraw.Draw(page4)
     centered_text(draw, "Лист IV", 70, script_font(82), ink)
-    centered_text(draw, "три прежних слова — одна инструкция", 170, script_font(40), faded_ink)
-    centered_text(draw, "столбцы помнят первое слово", 230, script_font(38), faded_ink)
+    centered_text(draw, "верхний ряд сбился с порядка", 170, script_font(40), faded_ink)
+    centered_text(draw, "третье слово знает, как его вернуть", 230, script_font(38), faded_ink)
 
-    grid_x, grid_y, cell = 245, 360, 85
+    grid_x, grid_y, cell = 245, 430, 85
     grid_size = cell * 6
     label_font = script_font(32)
     for index in range(7):
@@ -825,12 +828,16 @@ def make_n3():
         draw.line((grid_x, grid_y + offset, grid_x + grid_size, grid_y + offset), fill=ink, width=3)
     header_scale = 13
     cell_scale = 18
-    for index, letter in enumerate(unique_key):
+    for index, letter in enumerate(header_key):
+        draw.text(
+            (grid_x + index * cell + cell / 2, grid_y - 88),
+            str(index + 1), fill=faded_ink, font=label_font, anchor="mm",
+        )
         draw_pigpen(
             draw,
             (
                 int(grid_x + index * cell + cell / 2 - header_scale),
-                grid_y - 62,
+                grid_y - 68,
             ),
             letter,
             scale=header_scale,
@@ -860,7 +867,7 @@ def make_n3():
     print(f"  N3  pigpen {word1}; crib {crib}")
     print(f"  N3  rail {rail_plain} → {rail_c}")
     print(f"  N3  polybius key={word1} {polybius_plain} → {' '.join(polybius_pairs)}")
-    print(f"  N3  pigpen-grid cols={unique_key} {picks} → {''.join(got)}")
+    print(f"  N3  pigpen-grid header={header_key} sort={keyword} {picks} → {''.join(got)}")
 
 
 # ===================================================================== N4
