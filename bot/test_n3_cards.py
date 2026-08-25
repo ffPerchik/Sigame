@@ -69,7 +69,7 @@ class N3CardStyleTests(unittest.TestCase):
         n3 = source.split("def make_n3():", 1)[1].split("# ===================================================================== N4", 1)[0]
         self.assertIn(f'rail_plain = "{plain}"', n3)
         self.assertIn("assert rail_counts == [7, 14, 7]", n3)
-        self.assertIn('polybius_pairs == ["43", "14", "11", "41", "45", "16"]', n3)
+        self.assertIn('polybius_pairs == ["43", "62", "26", "12", "14", "55"]', n3)
         self.assertIn('margin_text = "«первое слово начинает алфавит»"', n3)
         self.assertNotIn('margin_text = "на полях:', n3)
         self.assertIn("margin_layer.rotate(90", n3)
@@ -82,12 +82,12 @@ class N3CardStyleTests(unittest.TestCase):
     def test_final_sheet_uses_all_three_previous_answers(self):
         source = (REPO_ROOT / "bot" / "tools" / "make_quest_assets.py").read_text(encoding="utf-8")
         n3 = source.split("def make_n3():", 1)[1].split("# ===================================================================== N4", 1)[0]
-        self.assertIn('header_key = "ФАСОТР"', n3)
+        self.assertIn('header_key = "ЖЕСТЫЮ"', n3)
         self.assertIn("sorted(header_key) == sorted(keyword)", n3)
-        self.assertIn("sort_order == [3, 5, 6, 4, 1, 2]", n3)
-        self.assertIn('answer4 = "ИСТИНА"', n3)
+        self.assertIn("sort_order == [3, 6, 1, 2, 4, 5]", n3)
+        self.assertIn('answer4 = "ПРАВДА"', n3)
         self.assertIn("sort_order.index(column) + 1", n3)
-        self.assertIn('[(3, 4), (4, 5), (1, 5), (1, 4), (5, 4), (6, 5)]', n3)
+        self.assertIn('[(3, 5), (2, 2), (6, 4), (2, 3), (4, 3), (5, 6)]', n3)
         self.assertIn("верхний ряд сбился с порядка", n3)
         self.assertIn("третье слово знает, как его вернуть", n3)
         self.assertIn("язык первого листа ещё нужен", n3)

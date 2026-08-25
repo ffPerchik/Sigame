@@ -657,29 +657,29 @@ def make_n3():
     assert rail_counts == [7, 14, 7]
     assert "".join(rail_rows) == rail_c
 
-    polybius_plain = "СТРОФА"
+    polybius_plain = "СЮЖЕТЫ"
     polybius_alphabet = "".join(dict.fromkeys(word1 + RU_WITH_YO))
     polybius_pairs = []
     for letter in polybius_plain:
         index = polybius_alphabet.index(letter)
         polybius_pairs.append(f"{index // 6 + 1}{index % 6 + 1}")
     assert len(polybius_alphabet) == 33
-    assert polybius_pairs == ["43", "14", "11", "41", "45", "16"]
-    # Финал: шапка — перемешанная СТРОФА. Сортировка даёт 356412.
-    # Первая цифра пар листа III меняется на место этой цифры в 356412.
+    assert polybius_pairs == ["43", "62", "26", "12", "14", "55"]
+    # Финал: шапка — перемешанная СЮЖЕТЫ. Сортировка даёт 361245.
+    # Первая цифра пар листа III меняется на место этой цифры в 361245.
     # На листе IV пара читается наоборот: сначала столбец, потом строка.
     keyword = polybius_plain
-    header_key = "ФАСОТР"
+    header_key = "ЖЕСТЫЮ"
     assert sorted(header_key) == sorted(keyword)
     assert header_key != keyword
     sort_order = [header_key.index(letter) + 1 for letter in keyword]
-    assert sort_order == [3, 5, 6, 4, 1, 2]
-    answer4 = "ИСТИНА"
+    assert sort_order == [3, 6, 1, 2, 4, 5]
+    answer4 = "ПРАВДА"
     picks = []
     for pair in polybius_pairs:
         column, row = int(pair[0]), int(pair[1])
         picks.append((row, sort_order.index(column) + 1))
-    assert picks == [(3, 4), (4, 5), (1, 5), (1, 4), (5, 4), (6, 5)]
+    assert picks == [(3, 5), (2, 2), (6, 4), (2, 3), (4, 3), (5, 6)]
     assert len(set(picks)) == len(picks) == len(answer4) == 6
     grid_letters = [[""] * 6 for _ in range(6)]
     for (row, column), letter in zip(picks, answer4):
@@ -818,7 +818,7 @@ def make_n3():
     centered_text(draw, "  ".join(polybius_pairs), 1035, script_font(82), accent)
     page3.save(OUT / "artifact_3c.png", optimize=True)
 
-    # Лист IV: шапка — перемешанная СТРОФА. Сортировка даёт координаты.
+    # Лист IV: шапка — перемешанная СЮЖЕТЫ. Сортировка даёт координаты.
     page4 = parchment_page(PARCHMENT_SOURCE_4)
     draw = ImageDraw.Draw(page4)
     centered_text(draw, "Лист IV", 70, script_font(82), ink)
