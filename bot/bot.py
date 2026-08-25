@@ -10,7 +10,9 @@ from pathlib import Path
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
-from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
+from aiogram.exceptions import (
+    TelegramBadRequest, TelegramConflictError, TelegramRetryAfter,
+)
 from aiogram.filters import BaseFilter, Command, CommandStart
 from aiogram.types import (
     CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message,
@@ -893,6 +895,24 @@ async def on_message(message: Message) -> None:
 
 # ======================== main ==============================================
 
+async def ensure_single_polling_instance(tries: int = 5) -> None:
+    """409 на getUpdates означает второй живой экземпляр с этим токеном.
+
+    Несколько попыток терпят переходный конфликт при рестарте (/update),
+    затем процесс выходит с понятным сообщением вместо бесконечного спама.
+    Вызов без offset ничего не подтверждает — очередь обновлений не трогается.
+    """
+    for attempt in range(tries):
+        try:
+            await bot.get_updates(timeout=1)
+            return
+        except TelegramConflictError:
+            if attempt == tries - 1:
+                print(T.SINGLE_INSTANCE_CONFLICT, flush=True)
+                raise SystemExit(1)
+            await asyncio.sleep(1.0)
+
+
 async def main() -> None:
     db.init_db()
     # Старые тестовые БД могли сохранить гейт до пролога. После переноса гейта
@@ -902,6 +922,7 @@ async def main() -> None:
             db.set_stage(player["user_id"], INTRO_STAGE)
             db.log_event(player["user_id"], "stage_migrated", "start_gate -> z_1")
     await bot.delete_webhook(drop_pending_updates=True)
+    await ensure_single_polling_instance()
     me = await bot.get_me()
     extra = " HOST_CONSOLE=1 (уведомления → консоль, гейты → авто)" if cfg.HOST_CONSOLE else ""
     print(T.STARTUP.format(username=me.username, host=cfg.HOST_ID) + extra)

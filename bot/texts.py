@@ -93,6 +93,11 @@ HINT_USED = (
 
 # ============ ДИАГНОСТИКА ============
 PONG = "🏓 pong — бот жив и отвечает"
+SINGLE_INSTANCE_CONFLICT = (
+    "⚠️ Conflict: long-polling уже занят другим процессом с этим токеном.\n"
+    "Оставь только один экземпляр: pkill -f bot.py (или закрой лишний терминал/\n"
+    "tmux/VPS), затем запусти бот снова. Этот процесс завершается."
+)
 ID_VERDICT_HOST = "✅ совпадает — ты ведущий, админ-команды работают"
 ID_VERDICT_NOT_HOST = "❌ НЕ совпадает с HOST_ID — админ-команды (/stats и т.д.) молчат. Впиши свой реальный id в .env как HOST_ID и перезапусти бота."
 ID_TEMPLATE = "Твой Telegram ID: {uid}\nHOST_ID в .env: {host}\n{verdict}"
