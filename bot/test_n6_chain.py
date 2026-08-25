@@ -81,7 +81,7 @@ class N6ChainTests(unittest.TestCase):
         words = []
         for n in range(1, 6):
             text = self.stages[f"N{n}_fragment"]["text"]
-            match = re.search(r"Слово Жени для финала: ([А-ЯЁ]+)", text)
+            match = re.search(r"█+\s+([А-ЯЁ]+)\s+█+", text)
             self.assertIsNotNone(match, f"N{n}_fragment")
             words.append(match.group(1))
         self.assertEqual(words, ["ФОТОПЛЁНКА", "ИМПУЛЬС", "НАЧАЛО", "АПЕРТУРА", "ЛОГИКА"])
